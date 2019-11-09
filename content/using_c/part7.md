@@ -1,5 +1,6 @@
 ---
 title: Part 7 - Introduction to the B-Tree
+weight: 7
 ---
 
 The B-Tree is the data structure SQLite uses to represent both tables and indexes, so it's a pretty central idea. This article will just introduce the data structure, so it won't have any code.

@@ -1,5 +1,6 @@
 ---
 title: Part 9 - Binary Search and Duplicate Keys
+weight: 9
 ---
 
 Last time we noted that we're still storing keys in unsorted order. We're going to fix that problem, plus detect and reject duplicate keys.
