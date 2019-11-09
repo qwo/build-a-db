@@ -1,5 +1,6 @@
 ---
 title: Part 6 - The Cursor Abstraction
+weight: 6
 ---
 
 This should be a shorter part than the last one. We're just going to refactor a bit to make it easier to start the B-Tree implementation.

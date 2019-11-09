@@ -1,5 +1,6 @@
 ---
 title: Part 12 - Scanning a Multi-Level B-Tree
+weight: 12
 ---
 
 We now support constructing a multi-level btree, but we've broken `select` statements in the process. Here's a test case that inserts 15 rows and then tries to print them.

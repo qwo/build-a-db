@@ -1,5 +1,6 @@
 ---
 title: Part 8 - B-Tree Leaf Node Format
+weight: 8
 ---
 
 We're changing the format of our table from an unsorted array of rows to a B-Tree. This is a pretty big change that is going to take multiple articles to implement. By the end of this article, we'll define the layout of a leaf node and support inserting key/value pairs into a single-node tree. But first, let's recap the reasons for switching to a tree structure.

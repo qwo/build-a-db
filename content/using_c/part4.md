@@ -1,5 +1,6 @@
 ---
 title: Part 4 - Our First Tests (and Bugs)
+weight: 4
 ---
 
 We've got the ability to insert rows into our database and to print out all rows. Let's take a moment to test what we've got so far.
