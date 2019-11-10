@@ -3,7 +3,10 @@ title: Part 1 - Introduction and Setting up the REPL
 weight: 1
 ---
 
-As a web developer, I use relational databases every day at my job, but they're a black box to me. Some questions I have:
+As a web developer, I use relational databases every day at my job, but they're a black box to me. 
+
+Some questions I have:
+
 - What format is data saved in? (in memory and on disk)
 - When does it move from memory to disk?
 - Why can there only be one primary key per table?
@@ -22,7 +25,10 @@ There's lots of [documentation of sqlite internals](https://www.sqlite.org/arch.
 
 <img src="/assets/images/arch1.gif" description="sqlite architecture (https://www.sqlite.org/zipvfs/doc/trunk/www/howitworks.wiki)" />
 
-A query goes through a chain of components in order to retrieve or modify data. The **front-end** consists of the:
+A query goes through a chain of components in order to retrieve or modify data. 
+
+The **front-end** consists of the:
+
 - tokenizer
 - parser
 - code generator
@@ -30,6 +36,7 @@ A query goes through a chain of components in order to retrieve or modify data. 
 The input to the front-end is a SQL query. the output is sqlite virtual machine bytecode (essentially a compiled program that can operate on the database).
 
 The _back-end_ consists of the:
+
 - virtual machine
 - B-tree
 - pager
