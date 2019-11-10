@@ -1,0 +1,8 @@
+
+
+<figure class="code">
+  <figcaption>
+    <h2>{{ .Get "title" }}</h2>
+  </figcaption>
+{{ highlight (readFile (.Get "file")) (.Get "language") "linenos=table" }}
+</figure>
