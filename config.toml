@@ -19,12 +19,11 @@ enableMissingTranslationPlaceholders = false
 
     # Souce Code repository section
     description = "Learn By Building"
-    github_repository = "https://github.com/stanzheng/build_a_database"
-    version = "1.0.0"
+   version = "1.0.0"
 
     # Documentation repository section
     # documentation repository (set edit link to documentation repository)
-    github_doc_repository = "https://github.com/thingsym/hugo-theme-techdoc"
+    github_doc_repository = "https://github.com/stanzheng/build-a-db"
 
     # Analytic section
     google_analytics_id = "" # Your Google Analytics tracking id
@@ -62,5 +61,10 @@ enableMissingTranslationPlaceholders = false
 
 [[menu.main]]
     name = "Twitter"
-    url = "https://twitter.com/thingsym"
+    url = "https://twitter.com/stanzheng"
+    weight = 2
+
+[[menu.main]]
+    name = "Github"
+    url = "https://github.com/stanzheng/build-a-db"
     weight = 2
