@@ -9,6 +9,15 @@ Build a DB is an upgraded version of cstack's build-a-db in C project. Using the
 * Responsive web design
 * Documentation menu (Select Menu style)
 
+## Tests
+* Uses RSPEC
+
+Ubuntu 18.04+  - ` sudo apt install ruby-rspec-core` 
+
+`rspec` 
+
+
+
 ## Screenshot
 
 
