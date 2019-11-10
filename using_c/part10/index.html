@@ -1,0 +1,302 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 10 - Splitting a Leaf Node - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part10/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 10 - Splitting a Leaf Node</h1><p>Our B-Tree doesn&rsquo;t feel like much of a tree with only one node. To fix that, we need some code to split a leaf node in twain. And after that, we need to create an internal node to serve as a parent for the two leaf nodes.</p><p>Basically our goal for this article is to go from this:</p><p>{% include image.html url=&ldquo;assets/images/btree2.png&rdquo; description=&ldquo;one-node btree&rdquo; %}</p><p>to this:</p><p>{% include image.html url=&ldquo;assets/images/btree3.png&rdquo; description=&ldquo;two-level btree&rdquo; %}</p><p>First things first, let&rsquo;s remove the error handling for a full leaf node:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
+   void* node = get_page(cursor-&gt;table-&gt;pager, cursor-&gt;page_num);
+ 
+   uint32_t num_cells = *leaf_node_num_cells(node);
+   if (num_cells &gt;= LEAF_NODE_MAX_CELLS) {
+     // Node full
+<span class=gd>-    printf(&#34;Need to implement splitting a leaf node.\n&#34;);
+</span><span class=gd>-    exit(EXIT_FAILURE);
+</span><span class=gd></span><span class=gi>+    leaf_node_split_and_insert(cursor, key, value);
+</span><span class=gi>+    return;
+</span><span class=gi></span>   }
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>ExecuteResult execute_insert(Statement* statement, Table* table) {
+   void* node = get_page(table-&gt;pager, table-&gt;root_page_num);
+   uint32_t num_cells = (*leaf_node_num_cells(node));
+<span class=gd>-  if (num_cells &gt;= LEAF_NODE_MAX_CELLS) {
+</span><span class=gd>-    return EXECUTE_TABLE_FULL;
+</span><span class=gd>-  }
+</span><span class=gd></span> 
+   Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
+   uint32_t key_to_insert = row_to_insert-&gt;id;
+</code></pre></div><h2 id=splitting-algorithm>Splitting Algorithm</h2><p>Easy part&rsquo;s over. Here&rsquo;s a description of what we need to do from <a href="https://play.google.com/store/books/details/Sibsankar_Haldar_SQLite_Database_System_Design_and?id=9Z6IQQnX1JEC&amp;hl=en">SQLite Database System: Design and Implementation</a></p><blockquote><p>If there is no space on the leaf node, we would split the existing entries residing there and the new one (being inserted) into two equal halves: lower and upper halves. (Keys on the upper half are strictly greater than those on the lower half.) We allocate a new leaf node, and move the upper half into the new node.</p></blockquote><p>Let&rsquo;s get a handle to the old node and create the new node:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void leaf_node_split_and_insert(Cursor* cursor, uint32_t key, Row* value) {
+</span><span class=gi>+  /*
+</span><span class=gi>+  Create a new node and move half the cells over.
+</span><span class=gi>+  Insert the new value in one of the two nodes.
+</span><span class=gi>+  Update parent or create a new parent.
+</span><span class=gi>+  */
+</span><span class=gi>+
+</span><span class=gi>+  void* old_node = get_page(cursor-&gt;table-&gt;pager, cursor-&gt;page_num);
+</span><span class=gi>+  uint32_t new_page_num = get_unused_page_num(cursor-&gt;table-&gt;pager);
+</span><span class=gi>+  void* new_node = get_page(cursor-&gt;table-&gt;pager, new_page_num);
+</span><span class=gi>+  initialize_leaf_node(new_node);
+</span></code></pre></div><p>Next, copy every cell into its new location:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  /*
+</span><span class=gi>+  All existing keys plus new key should be divided
+</span><span class=gi>+  evenly between old (left) and new (right) nodes.
+</span><span class=gi>+  Starting from the right, move each key to correct position.
+</span><span class=gi>+  */
+</span><span class=gi>+  for (int32_t i = LEAF_NODE_MAX_CELLS; i &gt;= 0; i--) {
+</span><span class=gi>+    void* destination_node;
+</span><span class=gi>+    if (i &gt;= LEAF_NODE_LEFT_SPLIT_COUNT) {
+</span><span class=gi>+      destination_node = new_node;
+</span><span class=gi>+    } else {
+</span><span class=gi>+      destination_node = old_node;
+</span><span class=gi>+    }
+</span><span class=gi>+    uint32_t index_within_node = i % LEAF_NODE_LEFT_SPLIT_COUNT;
+</span><span class=gi>+    void* destination = leaf_node_cell(destination_node, index_within_node);
+</span><span class=gi>+
+</span><span class=gi>+    if (i == cursor-&gt;cell_num) {
+</span><span class=gi>+      serialize_row(value, destination);
+</span><span class=gi>+    } else if (i &gt; cursor-&gt;cell_num) {
+</span><span class=gi>+      memcpy(destination, leaf_node_cell(old_node, i - 1), LEAF_NODE_CELL_SIZE);
+</span><span class=gi>+    } else {
+</span><span class=gi>+      memcpy(destination, leaf_node_cell(old_node, i), LEAF_NODE_CELL_SIZE);
+</span><span class=gi>+    }
+</span><span class=gi>+  }
+</span></code></pre></div><p>Update cell counts in each node&rsquo;s header:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  /* Update cell count on both leaf nodes */
+</span><span class=gi>+  *(leaf_node_num_cells(old_node)) = LEAF_NODE_LEFT_SPLIT_COUNT;
+</span><span class=gi>+  *(leaf_node_num_cells(new_node)) = LEAF_NODE_RIGHT_SPLIT_COUNT;
+</span></code></pre></div><p>Then we need to update the nodes&rsquo; parent. If the original node was the root, it had no parent. In that case, create a new root node to act as the parent. I&rsquo;ll stub out the other branch for now:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  if (is_node_root(old_node)) {
+</span><span class=gi>+    return create_new_root(cursor-&gt;table, new_page_num);
+</span><span class=gi>+  } else {
+</span><span class=gi>+    printf(&#34;Need to implement updating parent after split\n&#34;);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span></code></pre></div><h2 id=allocating-new-pages>Allocating New Pages</h2><p>Let&rsquo;s go back and define a few new functions and constants. When we created a new leaf node, we put it in a page decided by <code>get_unused_page_num()</code>:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+Until we start recycling free pages, new pages will always
+</span><span class=gi>+go onto the end of the database file
+</span><span class=gi>+*/
+</span><span class=gi>+uint32_t get_unused_page_num(Pager* pager) { return pager-&gt;num_pages; }
+</span></code></pre></div><p>For now, we&rsquo;re assuming that in a database with N pages, page numbers 0 through N-1 are allocated. Therefore we can always allocate page number N for new pages. Eventually after we implement deletion, some pages may become empty and their page numbers unused. To be more efficient, we could re-allocate those free pages.</p><h2 id=leaf-node-sizes>Leaf Node Sizes</h2><p>To keep the tree balanced, we evenly distribute cells between the two new nodes. If a leaf node can hold N cells, then during a split we need to distribute N+1 cells between two nodes (N original cells plus one new one). I&rsquo;m arbitrarily choosing the left node to get one more cell if N+1 is odd.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+const uint32_t LEAF_NODE_RIGHT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) / 2;
+</span><span class=gi>+const uint32_t LEAF_NODE_LEFT_SPLIT_COUNT =
+</span><span class=gi>+    (LEAF_NODE_MAX_CELLS + 1) - LEAF_NODE_RIGHT_SPLIT_COUNT;
+</span></code></pre></div><h2 id=creating-a-new-root>Creating a New Root</h2><p>Here&rsquo;s how <a href="https://play.google.com/store/books/details/Sibsankar_Haldar_SQLite_Database_System_Design_and?id=9Z6IQQnX1JEC&amp;hl=en">SQLite Database System</a> explains the process of creating a new root node:</p><blockquote><p>Let N be the root node. First allocate two nodes, say L and R. Move lower half of N into L and the upper half into R. Now N is empty. Add 〈L, K,R〉 in N, where K is the max key in L. Page N remains the root. Note that the depth of the tree has increased by one, but the new tree remains height balanced without violating any B+-tree property.</p></blockquote><p>At this point, we&rsquo;ve already allocated the right child and moved the upper half into it. Our function takes the right child as input and allocates a new page to store the left child.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void create_new_root(Table* table, uint32_t right_child_page_num) {
+</span><span class=gi>+  /*
+</span><span class=gi>+  Handle splitting the root.
+</span><span class=gi>+  Old root copied to new page, becomes left child.
+</span><span class=gi>+  Address of right child passed in.
+</span><span class=gi>+  Re-initialize root page to contain the new root node.
+</span><span class=gi>+  New root node points to two children.
+</span><span class=gi>+  */
+</span><span class=gi>+
+</span><span class=gi>+  void* root = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  void* right_child = get_page(table-&gt;pager, right_child_page_num);
+</span><span class=gi>+  uint32_t left_child_page_num = get_unused_page_num(table-&gt;pager);
+</span><span class=gi>+  void* left_child = get_page(table-&gt;pager, left_child_page_num);
+</span></code></pre></div><p>The old root is copied to the left child so we can reuse the root page:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  /* Left child has data copied from old root */
+</span><span class=gi>+  memcpy(left_child, root, PAGE_SIZE);
+</span><span class=gi>+  set_node_root(left_child, false);
+</span></code></pre></div><p>Finally we initialize the root page as a new internal node with two children.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  /* Root node is a new internal node with one key and two children */
+</span><span class=gi>+  initialize_internal_node(root);
+</span><span class=gi>+  set_node_root(root, true);
+</span><span class=gi>+  *internal_node_num_keys(root) = 1;
+</span><span class=gi>+  *internal_node_child(root, 0) = left_child_page_num;
+</span><span class=gi>+  uint32_t left_child_max_key = get_node_max_key(left_child);
+</span><span class=gi>+  *internal_node_key(root, 0) = left_child_max_key;
+</span><span class=gi>+  *internal_node_right_child(root) = right_child_page_num;
+</span><span class=gi>+}
+</span></code></pre></div><h2 id=internal-node-format>Internal Node Format</h2><p>Now that we&rsquo;re finally creating an internal node, we have to define its layout. It starts with the common header, then the number of keys it contains, then the page number of its rightmost child. Internal nodes always have one more child pointer than they have keys. That extra child pointer is stored in the header.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+ * Internal Node Header Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t INTERNAL_NODE_NUM_KEYS_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t INTERNAL_NODE_NUM_KEYS_OFFSET = COMMON_NODE_HEADER_SIZE;
+</span><span class=gi>+const uint32_t INTERNAL_NODE_RIGHT_CHILD_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t INTERNAL_NODE_RIGHT_CHILD_OFFSET =
+</span><span class=gi>+    INTERNAL_NODE_NUM_KEYS_OFFSET + INTERNAL_NODE_NUM_KEYS_SIZE;
+</span><span class=gi>+const uint32_t INTERNAL_NODE_HEADER_SIZE = COMMON_NODE_HEADER_SIZE +
+</span><span class=gi>+                                           INTERNAL_NODE_NUM_KEYS_SIZE +
+</span><span class=gi>+                                           INTERNAL_NODE_RIGHT_CHILD_SIZE;
+</span></code></pre></div><p>The body is an array of cells where each cell contains a child pointer and a key. Every key should be the maximum key contained in the child to its left.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+ * Internal Node Body Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t INTERNAL_NODE_KEY_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t INTERNAL_NODE_CHILD_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t INTERNAL_NODE_CELL_SIZE =
+</span><span class=gi>+    INTERNAL_NODE_CHILD_SIZE + INTERNAL_NODE_KEY_SIZE;
+</span></code></pre></div><p>Based on these constants, here&rsquo;s how the layout of an internal node will look:</p><p>{% include image.html url=&ldquo;assets/images/internal-node-format.png&rdquo; description=&ldquo;Our internal node format&rdquo; %}</p><p>Notice our huge branching factor. Because each child pointer / key pair is so small, we can fit 510 keys and 511 child pointers in each internal node. That means we&rsquo;ll never have to traverse many layers of the tree to find a given key!</p><table><thead><tr><th># internal node layers</th><th>max # leaf nodes</th><th>Size of all leaf nodes</th></tr></thead><tbody><tr><td>0</td><td>511^0 = 1</td><td>4 KB</td></tr><tr><td>1</td><td>511^1 = 512</td><td>~2 MB</td></tr><tr><td>2</td><td>511^2 = 261,121</td><td>~1 GB</td></tr><tr><td>3</td><td>511^3 = 133,432,831</td><td>~550 GB</td></tr></tbody></table><p>In actuality, we can&rsquo;t store a full 4 KB of data per leaf node due to the overhead of the header, keys, and wasted space. But we can search through something like 500 GB of data by loading only 4 pages from disk. This is why the B-Tree is a useful data structure for databases.</p><p>Here are the methods for reading and writing to an internal node:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+uint32_t* internal_node_num_keys(void* node) {
+</span><span class=gi>+  return node + INTERNAL_NODE_NUM_KEYS_OFFSET;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* internal_node_right_child(void* node) {
+</span><span class=gi>+  return node + INTERNAL_NODE_RIGHT_CHILD_OFFSET;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* internal_node_cell(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return node + INTERNAL_NODE_HEADER_SIZE + cell_num * INTERNAL_NODE_CELL_SIZE;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* internal_node_child(void* node, uint32_t child_num) {
+</span><span class=gi>+  uint32_t num_keys = *internal_node_num_keys(node);
+</span><span class=gi>+  if (child_num &gt; num_keys) {
+</span><span class=gi>+    printf(&#34;Tried to access child_num %d &gt; num_keys %d\n&#34;, child_num, num_keys);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  } else if (child_num == num_keys) {
+</span><span class=gi>+    return internal_node_right_child(node);
+</span><span class=gi>+  } else {
+</span><span class=gi>+    return internal_node_cell(node, child_num);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* internal_node_key(void* node, uint32_t key_num) {
+</span><span class=gi>+  return internal_node_cell(node, key_num) + INTERNAL_NODE_CHILD_SIZE;
+</span><span class=gi>+}
+</span></code></pre></div><p>For an internal node, the maximum key is always its right key. For a leaf node, it&rsquo;s the key at the maximum index:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+uint32_t get_node_max_key(void* node) {
+</span><span class=gi>+  switch (get_node_type(node)) {
+</span><span class=gi>+    case NODE_INTERNAL:
+</span><span class=gi>+      return *internal_node_key(node, *internal_node_num_keys(node) - 1);
+</span><span class=gi>+    case NODE_LEAF:
+</span><span class=gi>+      return *leaf_node_key(node, *leaf_node_num_cells(node) - 1);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span></code></pre></div><h2 id=keeping-track-of-the-root>Keeping Track of the Root</h2><p>We&rsquo;re finally using the <code>is_root</code> field in the common node header. Recall that we use it to decide how to split a leaf node:</p><div class=highlight><pre class=chroma><code class=language-c data-lang=c>  <span class=k>if</span> <span class=p>(</span><span class=n>is_node_root</span><span class=p>(</span><span class=n>old_node</span><span class=p>))</span> <span class=p>{</span>
+    <span class=k>return</span> <span class=n>create_new_root</span><span class=p>(</span><span class=n>cursor</span><span class=o>-&gt;</span><span class=n>table</span><span class=p>,</span> <span class=n>new_page_num</span><span class=p>);</span>
+  <span class=p>}</span> <span class=k>else</span> <span class=p>{</span>
+    <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Need to implement updating parent after split</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+    <span class=n>exit</span><span class=p>(</span><span class=n>EXIT_FAILURE</span><span class=p>);</span>
+  <span class=p>}</span>
+<span class=p>}</span></code></pre></div><p>Here are the getter and setter:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+bool is_node_root(void* node) {
+</span><span class=gi>+  uint8_t value = *((uint8_t*)(node + IS_ROOT_OFFSET));
+</span><span class=gi>+  return (bool)value;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void set_node_root(void* node, bool is_root) {
+</span><span class=gi>+  uint8_t value = is_root;
+</span><span class=gi>+  *((uint8_t*)(node + IS_ROOT_OFFSET)) = value;
+</span><span class=gi>+}
+</span></code></pre></div><p>Initializing both types of nodes should default to setting <code>is_root</code> to false:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> void initialize_leaf_node(void* node) {
+   set_node_type(node, NODE_LEAF);
+<span class=gi>+  set_node_root(node, false);
+</span><span class=gi></span>   *leaf_node_num_cells(node) = 0;
+ }
+
+<span class=gi>+void initialize_internal_node(void* node) {
+</span><span class=gi>+  set_node_type(node, NODE_INTERNAL);
+</span><span class=gi>+  set_node_root(node, false);
+</span><span class=gi>+  *internal_node_num_keys(node) = 0;
+</span><span class=gi>+}
+</span></code></pre></div><p>We should set <code>is_root</code> to true when creating the first node of the table:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>     // New database file. Initialize page 0 as leaf node.
+     void* root_node = get_page(pager, 0);
+     initialize_leaf_node(root_node);
+<span class=gi>+    set_node_root(root_node, true);
+</span><span class=gi></span>   }
+ 
+   return table;
+</code></pre></div><h2 id=printing-the-tree>Printing the Tree</h2><p>To help us visualize the state of the database, we should update our <code>.btree</code> metacommand to print a multi-level tree.</p><p>I&rsquo;m going to replace the current <code>print_leaf_node()</code> function</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-void print_leaf_node(void* node) {
+</span><span class=gd>-  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gd>-  printf(&#34;leaf (size %d)\n&#34;, num_cells);
+</span><span class=gd>-  for (uint32_t i = 0; i &lt; num_cells; i++) {
+</span><span class=gd>-    uint32_t key = *leaf_node_key(node, i);
+</span><span class=gd>-    printf(&#34;  - %d : %d\n&#34;, i, key);
+</span><span class=gd>-  }
+</span><span class=gd>-}
+</span></code></pre></div><p>with a new recursive function that takes any node, then prints it and its children. It takes an indentation level as a parameter, which increases with each recursive call. I&rsquo;m also adding a tiny helper function to indent.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void indent(uint32_t level) {
+</span><span class=gi>+  for (uint32_t i = 0; i &lt; level; i++) {
+</span><span class=gi>+    printf(&#34;  &#34;);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void print_tree(Pager* pager, uint32_t page_num, uint32_t indentation_level) {
+</span><span class=gi>+  void* node = get_page(pager, page_num);
+</span><span class=gi>+  uint32_t num_keys, child;
+</span><span class=gi>+
+</span><span class=gi>+  switch (get_node_type(node)) {
+</span><span class=gi>+    case (NODE_LEAF):
+</span><span class=gi>+      num_keys = *leaf_node_num_cells(node);
+</span><span class=gi>+      indent(indentation_level);
+</span><span class=gi>+      printf(&#34;- leaf (size %d)\n&#34;, num_keys);
+</span><span class=gi>+      for (uint32_t i = 0; i &lt; num_keys; i++) {
+</span><span class=gi>+        indent(indentation_level + 1);
+</span><span class=gi>+        printf(&#34;- %d\n&#34;, *leaf_node_key(node, i));
+</span><span class=gi>+      }
+</span><span class=gi>+      break;
+</span><span class=gi>+    case (NODE_INTERNAL):
+</span><span class=gi>+      num_keys = *internal_node_num_keys(node);
+</span><span class=gi>+      indent(indentation_level);
+</span><span class=gi>+      printf(&#34;- internal (size %d)\n&#34;, num_keys);
+</span><span class=gi>+      for (uint32_t i = 0; i &lt; num_keys; i++) {
+</span><span class=gi>+        child = *internal_node_child(node, i);
+</span><span class=gi>+        print_tree(pager, child, indentation_level + 1);
+</span><span class=gi>+
+</span><span class=gi>+        indent(indentation_level + 1);
+</span><span class=gi>+        printf(&#34;- key %d\n&#34;, *internal_node_key(node, i));
+</span><span class=gi>+      }
+</span><span class=gi>+      child = *internal_node_right_child(node);
+</span><span class=gi>+      print_tree(pager, child, indentation_level + 1);
+</span><span class=gi>+      break;
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span></code></pre></div><p>And update the call to the print function, passing an indentation level of zero.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>   } else if (strcmp(input_buffer-&gt;buffer, &#34;.btree&#34;) == 0) {
+     printf(&#34;Tree:\n&#34;);
+<span class=gd>-    print_leaf_node(get_page(table-&gt;pager, 0));
+</span><span class=gd></span><span class=gi>+    print_tree(table-&gt;pager, 0, 0);
+</span><span class=gi></span>     return META_COMMAND_SUCCESS;
+</code></pre></div><p>Here&rsquo;s a test case for the new printing functionality!</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  it &#39;allows printing out the structure of a 3-leaf-node btree&#39; do
+</span><span class=gi>+    script = (1..14).map do |i|
+</span><span class=gi>+      &#34;insert #{i} user#{i} person#{i}@example.com&#34;
+</span><span class=gi>+    end
+</span><span class=gi>+    script &lt;&lt; &#34;.btree&#34;
+</span><span class=gi>+    script &lt;&lt; &#34;insert 15 user15 person15@example.com&#34;
+</span><span class=gi>+    script &lt;&lt; &#34;.exit&#34;
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+
+</span><span class=gi>+    expect(result[14...(result.length)]).to match_array([
+</span><span class=gi>+      &#34;db &gt; Tree:&#34;,
+</span><span class=gi>+      &#34;- internal (size 1)&#34;,
+</span><span class=gi>+      &#34;  - leaf (size 7)&#34;,
+</span><span class=gi>+      &#34;    - 1&#34;,
+</span><span class=gi>+      &#34;    - 2&#34;,
+</span><span class=gi>+      &#34;    - 3&#34;,
+</span><span class=gi>+      &#34;    - 4&#34;,
+</span><span class=gi>+      &#34;    - 5&#34;,
+</span><span class=gi>+      &#34;    - 6&#34;,
+</span><span class=gi>+      &#34;    - 7&#34;,
+</span><span class=gi>+      &#34;  - key 7&#34;,
+</span><span class=gi>+      &#34;  - leaf (size 7)&#34;,
+</span><span class=gi>+      &#34;    - 8&#34;,
+</span><span class=gi>+      &#34;    - 9&#34;,
+</span><span class=gi>+      &#34;    - 10&#34;,
+</span><span class=gi>+      &#34;    - 11&#34;,
+</span><span class=gi>+      &#34;    - 12&#34;,
+</span><span class=gi>+      &#34;    - 13&#34;,
+</span><span class=gi>+      &#34;    - 14&#34;,
+</span><span class=gi>+      &#34;db &gt; Need to implement searching an internal node&#34;,
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span></code></pre></div><p>The new format is a little simplified, so we need to update the existing <code>.btree</code> test:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>       &#34;db &gt; Executed.&#34;,
+       &#34;db &gt; Executed.&#34;,
+       &#34;db &gt; Tree:&#34;,
+<span class=gd>-      &#34;leaf (size 3)&#34;,
+</span><span class=gd>-      &#34;  - 0 : 1&#34;,
+</span><span class=gd>-      &#34;  - 1 : 2&#34;,
+</span><span class=gd>-      &#34;  - 2 : 3&#34;,
+</span><span class=gd></span><span class=gi>+      &#34;- leaf (size 3)&#34;,
+</span><span class=gi>+      &#34;  - 1&#34;,
+</span><span class=gi>+      &#34;  - 2&#34;,
+</span><span class=gi>+      &#34;  - 3&#34;,
+</span><span class=gi></span>       &#34;db &gt; &#34;
+     ])
+   end
+</code></pre></div><p>Here&rsquo;s the <code>.btree</code> output of the new test on its own:</p><pre><code>Tree:
+- internal (size 1)
+  - leaf (size 7)
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+  - key 7
+  - leaf (size 7)
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+</code></pre><p>On the least indented level, we see the root node (an internal node). It says <code>size 1</code> because it has one key. Indented one level, we see a leaf node, a key, and another leaf node. The key in the root node (7) is is the maximum key in the first leaf node. Every key greater than 7 is in the second leaf node.</p><h2 id=a-major-problem>A Major Problem</h2><p>If you&rsquo;ve been following along closely you may notice we&rsquo;ve missed something big. Look what happens if we try to insert one additional row:</p><pre><code>db &gt; insert 15 user15 person15@example.com
+Need to implement searching an internal node
+</code></pre><p>Whoops! Who wrote that TODO message? :P</p><p>Next time we&rsquo;ll continue the epic B-tree saga by implementing search on a multi-level tree.</p><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part10.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part9/ title="Part 9 - Binary Search and Duplicate Keys"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 9 - Binary Search and Duplicate Keys</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part11/ title="Part 11 - Recursively Searching the B-Tree">Next - Part 11 - Recursively Searching the B-Tree <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>

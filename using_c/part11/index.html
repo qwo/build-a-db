@@ -1,0 +1,68 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 11 - Recursively Searching the B-Tree - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part11/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 11 - Recursively Searching the B-Tree</h1><p>Last time we ended with an error inserting our 15th row:</p><pre><code>db &gt; insert 15 user15 person15@example.com
+Need to implement searching an internal node
+</code></pre><p>First, replace the code stub with a new function call.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>   if (get_node_type(root_node) == NODE_LEAF) {
+     return leaf_node_find(table, root_page_num, key);
+   } else {
+<span class=gd>-    printf(&#34;Need to implement searching an internal node\n&#34;);
+</span><span class=gd>-    exit(EXIT_FAILURE);
+</span><span class=gd></span><span class=gi>+    return internal_node_find(table, root_page_num, key);
+</span><span class=gi></span>   }
+ }
+</code></pre></div><p>This function will perform binary search to find the child that should contain the given key. Remember that the key to the right of each child pointer is the maximum key contained by that child.</p><p>{% include image.html url=&ldquo;assets/images/btree6.png&rdquo; description=&ldquo;three-level btree&rdquo; %}</p><p>So our binary search compares the key to find and the key to the right of the child pointer:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+Cursor* internal_node_find(Table* table, uint32_t page_num, uint32_t key) {
+</span><span class=gi>+  void* node = get_page(table-&gt;pager, page_num);
+</span><span class=gi>+  uint32_t num_keys = *internal_node_num_keys(node);
+</span><span class=gi>+
+</span><span class=gi>+  /* Binary search to find index of child to search */
+</span><span class=gi>+  uint32_t min_index = 0;
+</span><span class=gi>+  uint32_t max_index = num_keys; /* there is one more child than key */
+</span><span class=gi>+
+</span><span class=gi>+  while (min_index != max_index) {
+</span><span class=gi>+    uint32_t index = (min_index + max_index) / 2;
+</span><span class=gi>+    uint32_t key_to_right = *internal_node_key(node, index);
+</span><span class=gi>+    if (key_to_right &gt;= key) {
+</span><span class=gi>+      max_index = index;
+</span><span class=gi>+    } else {
+</span><span class=gi>+      min_index = index + 1;
+</span><span class=gi>+    }
+</span><span class=gi>+  }
+</span></code></pre></div><p>Also remember that the children of an internal node can be either leaf nodes or more internal nodes. After we find the correct child, call the appropriate search function on it:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  uint32_t child_num = *internal_node_child(node, min_index);
+</span><span class=gi>+  void* child = get_page(table-&gt;pager, child_num);
+</span><span class=gi>+  switch (get_node_type(child)) {
+</span><span class=gi>+    case NODE_LEAF:
+</span><span class=gi>+      return leaf_node_find(table, child_num, key);
+</span><span class=gi>+    case NODE_INTERNAL:
+</span><span class=gi>+      return internal_node_find(table, child_num, key);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span></code></pre></div><h1 id=tests>Tests</h1><p>Now inserting a key into a multi-node btree no longer results in an error. And we can update our test:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>       &#34;    - 12&#34;,
+       &#34;    - 13&#34;,
+       &#34;    - 14&#34;,
+<span class=gd>-      &#34;db &gt; Need to implement searching an internal node&#34;,
+</span><span class=gd></span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; &#34;,
+</span><span class=gi></span>     ])
+   end
+</code></pre></div><p>I also think it&rsquo;s time we revisit another test. The one that tries inserting 1400 rows. It still errors, but the error message is new. Right now, our tests don&rsquo;t handle it very well when the program crashes. If that happens, let&rsquo;s just use the output we&rsquo;ve gotten so far:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>     raw_output = nil
+     IO.popen(&#34;./db test.db&#34;, &#34;r+&#34;) do |pipe|
+       commands.each do |command|
+<span class=gd>-        pipe.puts command
+</span><span class=gd></span><span class=gi>+        begin
+</span><span class=gi>+          pipe.puts command
+</span><span class=gi>+        rescue Errno::EPIPE
+</span><span class=gi>+          break
+</span><span class=gi>+        end
+</span><span class=gi></span>       end
+
+       pipe.close_write
+</code></pre></div><p>And that reveals that our 1400-row test outputs this error:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>     end
+     script &lt;&lt; &#34;.exit&#34;
+     result = run_script(script)
+<span class=gd>-    expect(result[-2]).to eq(&#39;db &gt; Error: Table full.&#39;)
+</span><span class=gd></span><span class=gi>+    expect(result.last(2)).to match_array([
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Need to implement updating parent after split&#34;,
+</span><span class=gi>+    ])
+</span><span class=gi></span>   end
+</code></pre></div><p>Looks like that&rsquo;s next on our to-do list!</p><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part11.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part10/ title="Part 10 - Splitting a Leaf Node"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 10 - Splitting a Leaf Node</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part12/ title="Part 12 - Scanning a Multi-Level B-Tree">Next - Part 12 - Scanning a Multi-Level B-Tree <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>

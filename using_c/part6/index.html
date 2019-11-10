@@ -1,0 +1,156 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 6 - The Cursor Abstraction - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part6/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 6 - The Cursor Abstraction</h1><p>This should be a shorter part than the last one. We&rsquo;re just going to refactor a bit to make it easier to start the B-Tree implementation.</p><p>We&rsquo;re going to add a <code>Cursor</code> object which represents a location in the table. Things you might want to do with cursors:</p><ul><li>Create a cursor at the beginning of the table</li><li>Create a cursor at the end of the table</li><li>Access the row the cursor is pointing to</li><li>Advance the cursor to the next row</li></ul><p>Those are the behaviors we&rsquo;re going to implement now. Later, we will also want to:</p><ul><li>Delete the row pointed to by a cursor</li><li>Modify the row pointed to by a cursor</li><li>Search a table for a given ID, and create a cursor pointing to the row with that ID</li></ul><p>Without further ado, here&rsquo;s the <code>Cursor</code> type:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+typedef struct {
+</span><span class=gi>+  Table* table;
+</span><span class=gi>+  uint32_t row_num;
+</span><span class=gi>+  bool end_of_table;  // Indicates a position one past the last element
+</span><span class=gi>+} Cursor;
+</span></code></pre></div><p>Given our current table data structure, all you need to identify a location in a table is the row number.</p><p>A cursor also has a reference to the table it&rsquo;s part of (so our cursor functions can take just the cursor as a parameter).</p><p>Finally, it has a boolean called <code>end_of_table</code>. This is so we can represent a position past the end of the table (which is somewhere we may want to insert a row).</p><p><code>table_start()</code> and <code>table_end()</code> create new cursors:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+Cursor* table_start(Table* table) {
+</span><span class=gi>+  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gi>+  cursor-&gt;table = table;
+</span><span class=gi>+  cursor-&gt;row_num = 0;
+</span><span class=gi>+  cursor-&gt;end_of_table = (table-&gt;num_rows == 0);
+</span><span class=gi>+
+</span><span class=gi>+  return cursor;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+Cursor* table_end(Table* table) {
+</span><span class=gi>+  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gi>+  cursor-&gt;table = table;
+</span><span class=gi>+  cursor-&gt;row_num = table-&gt;num_rows;
+</span><span class=gi>+  cursor-&gt;end_of_table = true;
+</span><span class=gi>+
+</span><span class=gi>+  return cursor;
+</span><span class=gi>+}
+</span></code></pre></div><p>Our <code>row_slot()</code> function will become <code>cursor_value()</code>, which returns a pointer to the position described by the cursor:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-void* row_slot(Table* table, uint32_t row_num) {
+</span><span class=gd></span><span class=gi>+void* cursor_value(Cursor* cursor) {
+</span><span class=gi>+  uint32_t row_num = cursor-&gt;row_num;
+</span><span class=gi></span>   uint32_t page_num = row_num / ROWS_PER_PAGE;
+<span class=gd>-  void* page = get_page(table-&gt;pager, page_num);
+</span><span class=gd></span><span class=gi>+  void* page = get_page(cursor-&gt;table-&gt;pager, page_num);
+</span><span class=gi></span>   uint32_t row_offset = row_num % ROWS_PER_PAGE;
+   uint32_t byte_offset = row_offset * ROW_SIZE;
+   return page + byte_offset;
+ }
+</code></pre></div><p>Advancing the cursor in our current table structure is as simple as incrementing the row number. This will be a bit more complicated in a B-tree.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void cursor_advance(Cursor* cursor) {
+</span><span class=gi>+  cursor-&gt;row_num += 1;
+</span><span class=gi>+  if (cursor-&gt;row_num &gt;= cursor-&gt;table-&gt;num_rows) {
+</span><span class=gi>+    cursor-&gt;end_of_table = true;
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span></code></pre></div><p>Finally we can change our &ldquo;virtual machine&rdquo; methods to use the cursor abstraction. When inserting a row, we open a cursor at the end of table, write to that cursor location, then close the cursor.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>   Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
+<span class=gi>+  Cursor* cursor = table_end(table);
+</span><span class=gi></span>
+<span class=gd>-  serialize_row(row_to_insert, row_slot(table, table-&gt;num_rows));
+</span><span class=gd></span><span class=gi>+  serialize_row(row_to_insert, cursor_value(cursor));
+</span><span class=gi></span>   table-&gt;num_rows += 1;
+
+<span class=gi>+  free(cursor);
+</span><span class=gi>+
+</span><span class=gi></span>   return EXECUTE_SUCCESS;
+ }
+</code></pre></div><p>When selecting all rows in the table, we open a cursor at the start of the table, print the row, then advance the cursor to the next row. Repeat until we&rsquo;ve reached the end of the table.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> ExecuteResult execute_select(Statement* statement, Table* table) {
+<span class=gi>+  Cursor* cursor = table_start(table);
+</span><span class=gi>+
+</span><span class=gi></span>   Row row;
+<span class=gd>-  for (uint32_t i = 0; i &lt; table-&gt;num_rows; i++) {
+</span><span class=gd>-    deserialize_row(row_slot(table, i), &amp;row);
+</span><span class=gd></span><span class=gi>+  while (!(cursor-&gt;end_of_table)) {
+</span><span class=gi>+    deserialize_row(cursor_value(cursor), &amp;row);
+</span><span class=gi></span>     print_row(&amp;row);
+<span class=gi>+    cursor_advance(cursor);
+</span><span class=gi></span>   }
+<span class=gi>+
+</span><span class=gi>+  free(cursor);
+</span><span class=gi>+
+</span><span class=gi></span>   return EXECUTE_SUCCESS;
+ }
+</code></pre></div><p>Alright, that&rsquo;s it! Like I said, this was a shorter refactor that should help us as we rewrite our table data structure into a B-Tree. <code>execute_select()</code> and <code>execute_insert()</code> can interact with the table entirely through the cursor without assuming anything about how the table is stored.</p><p>Here&rsquo;s the complete diff to this part:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -78,6 +78,13 @@ struct {
+</span><span class=gu></span> } Table;
+
+<span class=gi>+typedef struct {
+</span><span class=gi>+  Table* table;
+</span><span class=gi>+  uint32_t row_num;
+</span><span class=gi>+  bool end_of_table; // Indicates a position one past the last element
+</span><span class=gi>+} Cursor;
+</span><span class=gi>+
+</span><span class=gi></span> void print_row(Row* row) {
+     printf(&#34;(%d, %s, %s)\n&#34;, row-&gt;id, row-&gt;username, row-&gt;email);
+ }
+<span class=gu>@@ -126,12 +133,38 @@ void* get_page(Pager* pager, uint32_t page_num) {
+</span><span class=gu></span>     return pager-&gt;pages[page_num];
+ }
+
+<span class=gd>-void* row_slot(Table* table, uint32_t row_num) {
+</span><span class=gd>-  uint32_t page_num = row_num / ROWS_PER_PAGE;
+</span><span class=gd>-  void *page = get_page(table-&gt;pager, page_num);
+</span><span class=gd>-  uint32_t row_offset = row_num % ROWS_PER_PAGE;
+</span><span class=gd>-  uint32_t byte_offset = row_offset * ROW_SIZE;
+</span><span class=gd>-  return page + byte_offset;
+</span><span class=gd></span><span class=gi>+Cursor* table_start(Table* table) {
+</span><span class=gi>+  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gi>+  cursor-&gt;table = table;
+</span><span class=gi>+  cursor-&gt;row_num = 0;
+</span><span class=gi>+  cursor-&gt;end_of_table = (table-&gt;num_rows == 0);
+</span><span class=gi>+
+</span><span class=gi>+  return cursor;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+Cursor* table_end(Table* table) {
+</span><span class=gi>+  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gi>+  cursor-&gt;table = table;
+</span><span class=gi>+  cursor-&gt;row_num = table-&gt;num_rows;
+</span><span class=gi>+  cursor-&gt;end_of_table = true;
+</span><span class=gi>+
+</span><span class=gi>+  return cursor;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void* cursor_value(Cursor* cursor) {
+</span><span class=gi>+  uint32_t row_num = cursor-&gt;row_num;
+</span><span class=gi>+  uint32_t page_num = row_num / ROWS_PER_PAGE;
+</span><span class=gi>+  void *page = get_page(cursor-&gt;table-&gt;pager, page_num);
+</span><span class=gi>+  uint32_t row_offset = row_num % ROWS_PER_PAGE;
+</span><span class=gi>+  uint32_t byte_offset = row_offset * ROW_SIZE;
+</span><span class=gi>+  return page + byte_offset;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void cursor_advance(Cursor* cursor) {
+</span><span class=gi>+  cursor-&gt;row_num += 1;
+</span><span class=gi>+  if (cursor-&gt;row_num &gt;= cursor-&gt;table-&gt;num_rows) {
+</span><span class=gi>+    cursor-&gt;end_of_table = true;
+</span><span class=gi>+  }
+</span><span class=gi></span> }
+
+ Pager* pager_open(const char* filename) {
+<span class=gu>@@ -327,19 +360,28 @@ ExecuteResult execute_insert(Statement* statement, Table* table) {
+</span><span class=gu></span>     }
+
+   Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
+<span class=gi>+  Cursor* cursor = table_end(table);
+</span><span class=gi></span>
+<span class=gd>-  serialize_row(row_to_insert, row_slot(table, table-&gt;num_rows));
+</span><span class=gd></span><span class=gi>+  serialize_row(row_to_insert, cursor_value(cursor));
+</span><span class=gi></span>   table-&gt;num_rows += 1;
+
+<span class=gi>+  free(cursor);
+</span><span class=gi>+
+</span><span class=gi></span>   return EXECUTE_SUCCESS;
+ }
+
+ ExecuteResult execute_select(Statement* statement, Table* table) {
+<span class=gi>+  Cursor* cursor = table_start(table);
+</span><span class=gi>+
+</span><span class=gi></span>   Row row;
+<span class=gd>-  for (uint32_t i = 0; i &lt; table-&gt;num_rows; i++) {
+</span><span class=gd>-     deserialize_row(row_slot(table, i), &amp;row);
+</span><span class=gd></span><span class=gi>+  while (!(cursor-&gt;end_of_table)) {
+</span><span class=gi>+     deserialize_row(cursor_value(cursor), &amp;row);
+</span><span class=gi></span>      print_row(&amp;row);
+<span class=gi>+     cursor_advance(cursor);
+</span><span class=gi></span>   }
+<span class=gi>+
+</span><span class=gi>+  free(cursor);
+</span><span class=gi>+
+</span><span class=gi></span>   return EXECUTE_SUCCESS;
+ }
+</code></pre></div><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part6.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part5/ title="Part 5 - Persistence to Disk"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 5 - Persistence to Disk</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part7/ title="Part 7 - Introduction to the B-Tree">Next - Part 7 - Introduction to the B-Tree <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>

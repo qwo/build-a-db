@@ -1,0 +1,683 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 8 - B-Tree Leaf Node Format - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part8/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 8 - B-Tree Leaf Node Format</h1><p>We&rsquo;re changing the format of our table from an unsorted array of rows to a B-Tree. This is a pretty big change that is going to take multiple articles to implement. By the end of this article, we&rsquo;ll define the layout of a leaf node and support inserting key/value pairs into a single-node tree. But first, let&rsquo;s recap the reasons for switching to a tree structure.</p><h2 id=alternative-table-formats>Alternative Table Formats</h2><p>With the current format, each page stores only rows (no metadata) so it is pretty space efficient. Insertion is also fast because we just append to the end. However, finding a particular row can only be done by scanning the entire table. And if we want to delete a row, we have to fill in the hole by moving every row that comes after it.</p><p>If we stored the table as an array, but kept rows sorted by id, we could use binary search to find a particular id. However, insertion would be slow because we would have to move a lot of rows to make space.</p><p>Instead, we&rsquo;re going with a tree structure. Each node in the tree can contain a variable number of rows, so we have to store some information in each node to keep track of how many rows it contains. Plus there is the storage overhead of all the internal nodes which don&rsquo;t store any rows. In exchange for a larger database file, we get fast insertion, deletion and lookup.</p><table><thead><tr><th></th><th>Unsorted Array of rows</th><th>Sorted Array of rows</th><th>Tree of nodes</th></tr></thead><tbody><tr><td>Pages contain</td><td>only data</td><td>only data</td><td>metadata, primary keys, and data</td></tr><tr><td>Rows per page</td><td>more</td><td>more</td><td>fewer</td></tr><tr><td>Insertion</td><td>O(1)</td><td>O(n)</td><td>O(log(n))</td></tr><tr><td>Deletion</td><td>O(n)</td><td>O(n)</td><td>O(log(n))</td></tr><tr><td>Lookup by id</td><td>O(n)</td><td>O(log(n))</td><td>O(log(n))</td></tr></tbody></table><h2 id=node-header-format>Node Header Format</h2><p>Leaf nodes and internal nodes have different layouts. Let&rsquo;s make an enum to keep track of node type:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+typedef enum { NODE_INTERNAL, NODE_LEAF } NodeType;
+</span></code></pre></div><p>Each node will correspond to one page. Internal nodes will point to their children by storing the page number that stores the child. The btree asks the pager for a particular page number and gets back a pointer into the page cache. Pages are stored in the database file one after the other in order of page number.</p><p>Nodes need to store some metadata in a header at the beginning of the page. Every node will store what type of node it is, whether or not it is the root node, and a pointer to its parent (to allow finding a node&rsquo;s siblings). I define constants for the size and offset of every header field:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+ * Common Node Header Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
+</span><span class=gi>+const uint32_t NODE_TYPE_OFFSET = 0;
+</span><span class=gi>+const uint32_t IS_ROOT_SIZE = sizeof(uint8_t);
+</span><span class=gi>+const uint32_t IS_ROOT_OFFSET = NODE_TYPE_SIZE;
+</span><span class=gi>+const uint32_t PARENT_POINTER_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
+</span><span class=gi>+const uint8_t COMMON_NODE_HEADER_SIZE =
+</span><span class=gi>+    NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
+</span></code></pre></div><h2 id=leaf-node-format>Leaf Node Format</h2><p>In addition to these common header fields, leaf nodes need to store how many &ldquo;cells&rdquo; they contain. A cell is a key/value pair.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+ * Leaf Node Header Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_HEADER_SIZE =
+</span><span class=gi>+    COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+</span></code></pre></div><p>The body of a leaf node is an array of cells. Each cell is a key followed by a value (a serialized row).</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+ * Leaf Node Body Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t LEAF_NODE_KEY_OFFSET = 0;
+</span><span class=gi>+const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_VALUE_OFFSET =
+</span><span class=gi>+    LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_SPACE_FOR_CELLS = PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_MAX_CELLS =
+</span><span class=gi>+    LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
+</span></code></pre></div><p>Based on these constants, here&rsquo;s what the layout of a leaf node looks like currently:</p><p>{% include image.html url=&ldquo;assets/images/leaf-node-format.png&rdquo; description=&ldquo;Our leaf node format&rdquo; %}</p><p>It&rsquo;s a little space inefficient to use an entire byte per boolean value in the header, but this makes it easier to write code to access those values.</p><p>Also notice that there&rsquo;s some wasted space at the end. We store as many cells as we can after the header, but the leftover space can&rsquo;t hold an entire cell. We leave it empty to avoid splitting cells between nodes.</p><h2 id=accessing-leaf-node-fields>Accessing Leaf Node Fields</h2><p>The code to access keys, values and metadata all involve pointer arithmetic using the constants we just defined.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+uint32_t* leaf_node_num_cells(void* node) {
+</span><span class=gi>+  return node + LEAF_NODE_NUM_CELLS_OFFSET;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void* leaf_node_cell(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* leaf_node_key(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return leaf_node_cell(node, cell_num);
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void* leaf_node_value(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return leaf_node_cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void initialize_leaf_node(void* node) { *leaf_node_num_cells(node) = 0; }
+</span><span class=gi>+
+</span></code></pre></div><p>These methods return a pointer to the value in question, so they can be used both as a getter and a setter.</p><h2 id=changes-to-pager-and-table-objects>Changes to Pager and Table Objects</h2><p>Every node is going to take up exactly one page, even if it&rsquo;s not full. That means our pager no longer needs to support reading/writing partial pages.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gd></span><span class=gi>+void pager_flush(Pager* pager, uint32_t page_num) {
+</span><span class=gi></span>   if (pager-&gt;pages[page_num] == NULL) {
+     printf(&#34;Tried to flush null page\n&#34;);
+     exit(EXIT_FAILURE);
+<span class=gu>@@ -242,7 +337,7 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gu></span>   }
+ 
+   ssize_t bytes_written =
+<span class=gd>-      write(pager-&gt;file_descriptor, pager-&gt;pages[page_num], size);
+</span><span class=gd></span><span class=gi>+      write(pager-&gt;file_descriptor, pager-&gt;pages[page_num], PAGE_SIZE);
+</span><span class=gi></span> 
+   if (bytes_written == -1) {
+     printf(&#34;Error writing: %d\n&#34;, errno);
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> void db_close(Table* table) {
+   Pager* pager = table-&gt;pager;
+<span class=gd>-  uint32_t num_full_pages = table-&gt;num_rows / ROWS_PER_PAGE;
+</span><span class=gd></span> 
+<span class=gd>-  for (uint32_t i = 0; i &lt; num_full_pages; i++) {
+</span><span class=gd></span><span class=gi>+  for (uint32_t i = 0; i &lt; pager-&gt;num_pages; i++) {
+</span><span class=gi></span>     if (pager-&gt;pages[i] == NULL) {
+       continue;
+     }
+<span class=gd>-    pager_flush(pager, i, PAGE_SIZE);
+</span><span class=gd></span><span class=gi>+    pager_flush(pager, i);
+</span><span class=gi></span>     free(pager-&gt;pages[i]);
+     pager-&gt;pages[i] = NULL;
+   }
+ 
+<span class=gd>-  // There may be a partial page to write to the end of the file
+</span><span class=gd>-  // This should not be needed after we switch to a B-tree
+</span><span class=gd>-  uint32_t num_additional_rows = table-&gt;num_rows % ROWS_PER_PAGE;
+</span><span class=gd>-  if (num_additional_rows &gt; 0) {
+</span><span class=gd>-    uint32_t page_num = num_full_pages;
+</span><span class=gd>-    if (pager-&gt;pages[page_num] != NULL) {
+</span><span class=gd>-      pager_flush(pager, page_num, num_additional_rows * ROW_SIZE);
+</span><span class=gd>-      free(pager-&gt;pages[page_num]);
+</span><span class=gd>-      pager-&gt;pages[page_num] = NULL;
+</span><span class=gd>-    }
+</span><span class=gd>-  }
+</span><span class=gd>-
+</span><span class=gd></span>   int result = close(pager-&gt;file_descriptor);
+   if (result == -1) {
+     printf(&#34;Error closing db file.\n&#34;);
+</code></pre></div><p>Now it makes more sense to store the number of pages in our database rather than the number of rows. The number of pages should be associated with the pager object, not the table, since it&rsquo;s the number of pages used by the database, not a particular table. A btree is identified by its root node page number, so the table object needs to keep track of that.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> const uint32_t PAGE_SIZE = 4096;
+ const uint32_t TABLE_MAX_PAGES = 100;
+<span class=gd>-const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
+</span><span class=gd>-const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
+</span><span class=gd></span> 
+ typedef struct {
+   int file_descriptor;
+   uint32_t file_length;
+<span class=gi>+  uint32_t num_pages;
+</span><span class=gi></span>   void* pages[TABLE_MAX_PAGES];
+ } Pager;
+ 
+ typedef struct {
+   Pager* pager;
+<span class=gd>-  uint32_t num_rows;
+</span><span class=gd></span><span class=gi>+  uint32_t root_page_num;
+</span><span class=gi></span> } Table;
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -127,6 +200,10 @@ void* get_page(Pager* pager, uint32_t page_num) {
+</span><span class=gu></span>     }
+ 
+     pager-&gt;pages[page_num] = page;
+<span class=gi>+
+</span><span class=gi>+    if (page_num &gt;= pager-&gt;num_pages) {
+</span><span class=gi>+      pager-&gt;num_pages = page_num + 1;
+</span><span class=gi>+    }
+</span><span class=gi></span>   }
+ 
+   return pager-&gt;pages[page_num];
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -184,6 +269,12 @@ Pager* pager_open(const char* filename) {
+</span><span class=gu></span>   Pager* pager = malloc(sizeof(Pager));
+   pager-&gt;file_descriptor = fd;
+   pager-&gt;file_length = file_length;
+<span class=gi>+  pager-&gt;num_pages = (file_length / PAGE_SIZE);
+</span><span class=gi>+
+</span><span class=gi>+  if (file_length % PAGE_SIZE != 0) {
+</span><span class=gi>+    printf(&#34;Db file is not a whole number of pages. Corrupt file.\n&#34;);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  }
+</span><span class=gi></span> 
+   for (uint32_t i = 0; i &lt; TABLE_MAX_PAGES; i++) {
+     pager-&gt;pages[i] = NULL;
+</code></pre></div><h2 id=changes-to-the-cursor-object>Changes to the Cursor Object</h2><p>A cursor represents a position in the table. When our table was a simple array of rows, we could access a row given just the row number. Now that it&rsquo;s a tree, we identify a position by the page number of the node, and the cell number within that node.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> typedef struct {
+   Table* table;
+<span class=gd>-  uint32_t row_num;
+</span><span class=gd></span><span class=gi>+  uint32_t page_num;
+</span><span class=gi>+  uint32_t cell_num;
+</span><span class=gi></span>   bool end_of_table;  // Indicates a position one past the last element
+ } Cursor;
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> Cursor* table_start(Table* table) {
+   Cursor* cursor = malloc(sizeof(Cursor));
+   cursor-&gt;table = table;
+<span class=gd>-  cursor-&gt;row_num = 0;
+</span><span class=gd>-  cursor-&gt;end_of_table = (table-&gt;num_rows == 0);
+</span><span class=gd></span><span class=gi>+  cursor-&gt;page_num = table-&gt;root_page_num;
+</span><span class=gi>+  cursor-&gt;cell_num = 0;
+</span><span class=gi>+
+</span><span class=gi>+  void* root_node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(root_node);
+</span><span class=gi>+  cursor-&gt;end_of_table = (num_cells == 0);
+</span><span class=gi></span> 
+   return cursor;
+ }
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> Cursor* table_end(Table* table) {
+   Cursor* cursor = malloc(sizeof(Cursor));
+   cursor-&gt;table = table;
+<span class=gd>-  cursor-&gt;row_num = table-&gt;num_rows;
+</span><span class=gd></span><span class=gi>+  cursor-&gt;page_num = table-&gt;root_page_num;
+</span><span class=gi>+
+</span><span class=gi>+  void* root_node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(root_node);
+</span><span class=gi>+  cursor-&gt;cell_num = num_cells;
+</span><span class=gi></span>   cursor-&gt;end_of_table = true;
+ 
+   return cursor;
+ }
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> void* cursor_value(Cursor* cursor) {
+<span class=gd>-  uint32_t row_num = cursor-&gt;row_num;
+</span><span class=gd>-  uint32_t page_num = row_num / ROWS_PER_PAGE;
+</span><span class=gd></span><span class=gi>+  uint32_t page_num = cursor-&gt;page_num;
+</span><span class=gi></span>   void* page = get_page(cursor-&gt;table-&gt;pager, page_num);
+<span class=gd>-  uint32_t row_offset = row_num % ROWS_PER_PAGE;
+</span><span class=gd>-  uint32_t byte_offset = row_offset * ROW_SIZE;
+</span><span class=gd>-  return page + byte_offset;
+</span><span class=gd></span><span class=gi>+  return leaf_node_value(page, cursor-&gt;cell_num);
+</span><span class=gi></span> }
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> void cursor_advance(Cursor* cursor) {
+<span class=gd>-  cursor-&gt;row_num += 1;
+</span><span class=gd>-  if (cursor-&gt;row_num &gt;= cursor-&gt;table-&gt;num_rows) {
+</span><span class=gd></span><span class=gi>+  uint32_t page_num = cursor-&gt;page_num;
+</span><span class=gi>+  void* node = get_page(cursor-&gt;table-&gt;pager, page_num);
+</span><span class=gi>+
+</span><span class=gi>+  cursor-&gt;cell_num += 1;
+</span><span class=gi>+  if (cursor-&gt;cell_num &gt;= (*leaf_node_num_cells(node))) {
+</span><span class=gi></span>     cursor-&gt;end_of_table = true;
+   }
+ }
+</code></pre></div><h2 id=insertion-into-a-leaf-node>Insertion Into a Leaf Node</h2><p>In this article we&rsquo;re only going to implement enough to get a single-node tree. Recall from last article that a tree starts out as an empty leaf node:</p><p>{% include image.html url=&ldquo;assets/images/btree1.png&rdquo; description=&ldquo;empty btree&rdquo; %}</p><p>Key/value pairs can be added until the leaf node is full:</p><p>{% include image.html url=&ldquo;assets/images/btree2.png&rdquo; description=&ldquo;one-node btree&rdquo; %}</p><p>When we open the database for the first time, the database file will be empty, so we initialize page 0 to be an empty leaf node (the root node):</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> Table* db_open(const char* filename) {
+   Pager* pager = pager_open(filename);
+<span class=gd>-  uint32_t num_rows = pager-&gt;file_length / ROW_SIZE;
+</span><span class=gd></span> 
+   Table* table = malloc(sizeof(Table));
+   table-&gt;pager = pager;
+<span class=gd>-  table-&gt;num_rows = num_rows;
+</span><span class=gd></span><span class=gi>+  table-&gt;root_page_num = 0;
+</span><span class=gi>+
+</span><span class=gi>+  if (pager-&gt;num_pages == 0) {
+</span><span class=gi>+    // New database file. Initialize page 0 as leaf node.
+</span><span class=gi>+    void* root_node = get_page(pager, 0);
+</span><span class=gi>+    initialize_leaf_node(root_node);
+</span><span class=gi>+  }
+</span><span class=gi></span> 
+   return table;
+ }
+</code></pre></div><p>Next we&rsquo;ll make a function for inserting a key/value pair into a leaf node. It will take a cursor as input to represent the position where the pair should be inserted.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
+</span><span class=gi>+  void* node = get_page(cursor-&gt;table-&gt;pager, cursor-&gt;page_num);
+</span><span class=gi>+
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gi>+  if (num_cells &gt;= LEAF_NODE_MAX_CELLS) {
+</span><span class=gi>+    // Node full
+</span><span class=gi>+    printf(&#34;Need to implement splitting a leaf node.\n&#34;);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  }
+</span><span class=gi>+
+</span><span class=gi>+  if (cursor-&gt;cell_num &lt; num_cells) {
+</span><span class=gi>+    // Make room for new cell
+</span><span class=gi>+    for (uint32_t i = num_cells; i &gt; cursor-&gt;cell_num; i--) {
+</span><span class=gi>+      memcpy(leaf_node_cell(node, i), leaf_node_cell(node, i - 1),
+</span><span class=gi>+             LEAF_NODE_CELL_SIZE);
+</span><span class=gi>+    }
+</span><span class=gi>+  }
+</span><span class=gi>+
+</span><span class=gi>+  *(leaf_node_num_cells(node)) += 1;
+</span><span class=gi>+  *(leaf_node_key(node, cursor-&gt;cell_num)) = key;
+</span><span class=gi>+  serialize_row(value, leaf_node_value(node, cursor-&gt;cell_num));
+</span><span class=gi>+}
+</span><span class=gi>+
+</span></code></pre></div><p>We haven&rsquo;t implemented splitting yet, so we error if the node is full. Next we shift cells one space to the right to make room for the new cell. Then we write the new key/value into the empty space.</p><p>Since we assume the tree only has one node, our <code>execute_insert()</code> function simply needs to call this helper method:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> ExecuteResult execute_insert(Statement* statement, Table* table) {
+<span class=gd>-  if (table-&gt;num_rows &gt;= TABLE_MAX_ROWS) {
+</span><span class=gd></span><span class=gi>+  void* node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  if ((*leaf_node_num_cells(node) &gt;= LEAF_NODE_MAX_CELLS)) {
+</span><span class=gi></span>     return EXECUTE_TABLE_FULL;
+   }
+ 
+   Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
+   Cursor* cursor = table_end(table);
+ 
+<span class=gd>-  serialize_row(row_to_insert, cursor_value(cursor));
+</span><span class=gd>-  table-&gt;num_rows += 1;
+</span><span class=gd></span><span class=gi>+  leaf_node_insert(cursor, row_to_insert-&gt;id, row_to_insert);
+</span><span class=gi></span> 
+   free(cursor);
+</code></pre></div><p>With those changes, our database should work as before! Except now it returns a &ldquo;Table Full&rdquo; error much sooner, since we can&rsquo;t split the root node yet.</p><p>How many rows can the leaf node hold?</p><h2 id=command-to-print-constants>Command to Print Constants</h2><p>I&rsquo;m adding a new meta command to print out a few constants of interest.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void print_constants() {
+</span><span class=gi>+  printf(&#34;ROW_SIZE: %d\n&#34;, ROW_SIZE);
+</span><span class=gi>+  printf(&#34;COMMON_NODE_HEADER_SIZE: %d\n&#34;, COMMON_NODE_HEADER_SIZE);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_HEADER_SIZE: %d\n&#34;, LEAF_NODE_HEADER_SIZE);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_CELL_SIZE: %d\n&#34;, LEAF_NODE_CELL_SIZE);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_SPACE_FOR_CELLS: %d\n&#34;, LEAF_NODE_SPACE_FOR_CELLS);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_MAX_CELLS: %d\n&#34;, LEAF_NODE_MAX_CELLS);
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi></span><span class=gu>@@ -294,6 +376,14 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table* table) {
+</span><span class=gu></span>   if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
+     db_close(table);
+     exit(EXIT_SUCCESS);
+<span class=gi>+  } else if (strcmp(input_buffer-&gt;buffer, &#34;.constants&#34;) == 0) {
+</span><span class=gi>+    printf(&#34;Constants:\n&#34;);
+</span><span class=gi>+    print_constants();
+</span><span class=gi>+    return META_COMMAND_SUCCESS;
+</span><span class=gi></span>   } else {
+     return META_COMMAND_UNRECOGNIZED_COMMAND;
+   }
+</code></pre></div><p>I&rsquo;m also adding a test so we get alerted when those constants change:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  it &#39;prints constants&#39; do
+</span><span class=gi>+    script = [
+</span><span class=gi>+      &#34;.constants&#34;,
+</span><span class=gi>+      &#34;.exit&#34;,
+</span><span class=gi>+    ]
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+
+</span><span class=gi>+    expect(result).to match_array([
+</span><span class=gi>+      &#34;db &gt; Constants:&#34;,
+</span><span class=gi>+      &#34;ROW_SIZE: 293&#34;,
+</span><span class=gi>+      &#34;COMMON_NODE_HEADER_SIZE: 6&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_HEADER_SIZE: 10&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_CELL_SIZE: 297&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_SPACE_FOR_CELLS: 4086&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_MAX_CELLS: 13&#34;,
+</span><span class=gi>+      &#34;db &gt; &#34;,
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span></code></pre></div><p>So our table can hold 13 rows right now!</p><h2 id=tree-visualization>Tree Visualization</h2><p>To help with debugging and visualization, I&rsquo;m also adding a meta command to print out a representation of the btree.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+void print_leaf_node(void* node) {
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gi>+  printf(&#34;leaf (size %d)\n&#34;, num_cells);
+</span><span class=gi>+  for (uint32_t i = 0; i &lt; num_cells; i++) {
+</span><span class=gi>+    uint32_t key = *leaf_node_key(node, i);
+</span><span class=gi>+    printf(&#34;  - %d : %d\n&#34;, i, key);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span><span class=gi>+
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -294,6 +376,14 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table* table) {
+</span><span class=gu></span>   if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
+     db_close(table);
+     exit(EXIT_SUCCESS);
+<span class=gi>+  } else if (strcmp(input_buffer-&gt;buffer, &#34;.btree&#34;) == 0) {
+</span><span class=gi>+    printf(&#34;Tree:\n&#34;);
+</span><span class=gi>+    print_leaf_node(get_page(table-&gt;pager, 0));
+</span><span class=gi>+    return META_COMMAND_SUCCESS;
+</span><span class=gi></span>   } else if (strcmp(input_buffer-&gt;buffer, &#34;.constants&#34;) == 0) {
+     printf(&#34;Constants:\n&#34;);
+     print_constants();
+     return META_COMMAND_SUCCESS;
+   } else {
+     return META_COMMAND_UNRECOGNIZED_COMMAND;
+   }
+</code></pre></div><p>And a test</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  it &#39;allows printing out the structure of a one-node btree&#39; do
+</span><span class=gi>+    script = [3, 1, 2].map do |i|
+</span><span class=gi>+      &#34;insert #{i} user#{i} person#{i}@example.com&#34;
+</span><span class=gi>+    end
+</span><span class=gi>+    script &lt;&lt; &#34;.btree&#34;
+</span><span class=gi>+    script &lt;&lt; &#34;.exit&#34;
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+
+</span><span class=gi>+    expect(result).to match_array([
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Tree:&#34;,
+</span><span class=gi>+      &#34;leaf (size 3)&#34;,
+</span><span class=gi>+      &#34;  - 0 : 3&#34;,
+</span><span class=gi>+      &#34;  - 1 : 1&#34;,
+</span><span class=gi>+      &#34;  - 2 : 2&#34;,
+</span><span class=gi>+      &#34;db &gt; &#34;
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span></code></pre></div><p>Uh oh, we&rsquo;re still not storing rows in sorted order. You&rsquo;ll notice that <code>execute_insert()</code> inserts into the leaf node at the position returned by <code>table_end()</code>. So rows are stored in the order they were inserted, just like before.</p><h2 id=next-time>Next Time</h2><p>This all might seem like a step backwards. Our database now stores fewer rows than it did before, and we&rsquo;re still storing rows in unsorted order. But like I said at the beginning, this is a big change and it&rsquo;s important to break it up into manageable steps.</p><p>Next time, we&rsquo;ll implement finding a record by primary key, and start storing rows in sorted order.</p><h2 id=complete-diff>Complete Diff</h2><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -62,29 +62,101 @@ const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+</span><span class=gu></span>
+ const uint32_t PAGE_SIZE = 4096;
+ #define TABLE_MAX_PAGES 100
+<span class=gd>-const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
+</span><span class=gd>-const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
+</span><span class=gd></span> 
+ typedef struct {
+   int file_descriptor;
+   uint32_t file_length;
+<span class=gi>+  uint32_t num_pages;
+</span><span class=gi></span>   void* pages[TABLE_MAX_PAGES];
+ } Pager;
+ 
+ typedef struct {
+   Pager* pager;
+<span class=gd>-  uint32_t num_rows;
+</span><span class=gd></span><span class=gi>+  uint32_t root_page_num;
+</span><span class=gi></span> } Table;
+ 
+ typedef struct {
+   Table* table;
+<span class=gd>-  uint32_t row_num;
+</span><span class=gd></span><span class=gi>+  uint32_t page_num;
+</span><span class=gi>+  uint32_t cell_num;
+</span><span class=gi></span>   bool end_of_table;  // Indicates a position one past the last element
+ } Cursor;
+
+<span class=gi>+typedef enum { NODE_INTERNAL, NODE_LEAF } NodeType;
+</span><span class=gi>+
+</span><span class=gi>+/*
+</span><span class=gi>+ * Common Node Header Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
+</span><span class=gi>+const uint32_t NODE_TYPE_OFFSET = 0;
+</span><span class=gi>+const uint32_t IS_ROOT_SIZE = sizeof(uint8_t);
+</span><span class=gi>+const uint32_t IS_ROOT_OFFSET = NODE_TYPE_SIZE;
+</span><span class=gi>+const uint32_t PARENT_POINTER_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
+</span><span class=gi>+const uint8_t COMMON_NODE_HEADER_SIZE =
+</span><span class=gi>+    NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
+</span><span class=gi>+
+</span><span class=gi>+/*
+</span><span class=gi>+ * Leaf Node Header Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_HEADER_SIZE =
+</span><span class=gi>+    COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+</span><span class=gi>+
+</span><span class=gi>+/*
+</span><span class=gi>+ * Leaf Node Body Layout
+</span><span class=gi>+ */
+</span><span class=gi>+const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t LEAF_NODE_KEY_OFFSET = 0;
+</span><span class=gi>+const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_VALUE_OFFSET =
+</span><span class=gi>+    LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_SPACE_FOR_CELLS = PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_MAX_CELLS =
+</span><span class=gi>+    LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* leaf_node_num_cells(void* node) {
+</span><span class=gi>+  return node + LEAF_NODE_NUM_CELLS_OFFSET;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void* leaf_node_cell(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+uint32_t* leaf_node_key(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return leaf_node_cell(node, cell_num);
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void* leaf_node_value(void* node, uint32_t cell_num) {
+</span><span class=gi>+  return leaf_node_cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void print_constants() {
+</span><span class=gi>+  printf(&#34;ROW_SIZE: %d\n&#34;, ROW_SIZE);
+</span><span class=gi>+  printf(&#34;COMMON_NODE_HEADER_SIZE: %d\n&#34;, COMMON_NODE_HEADER_SIZE);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_HEADER_SIZE: %d\n&#34;, LEAF_NODE_HEADER_SIZE);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_CELL_SIZE: %d\n&#34;, LEAF_NODE_CELL_SIZE);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_SPACE_FOR_CELLS: %d\n&#34;, LEAF_NODE_SPACE_FOR_CELLS);
+</span><span class=gi>+  printf(&#34;LEAF_NODE_MAX_CELLS: %d\n&#34;, LEAF_NODE_MAX_CELLS);
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void print_leaf_node(void* node) {
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gi>+  printf(&#34;leaf (size %d)\n&#34;, num_cells);
+</span><span class=gi>+  for (uint32_t i = 0; i &lt; num_cells; i++) {
+</span><span class=gi>+    uint32_t key = *leaf_node_key(node, i);
+</span><span class=gi>+    printf(&#34;  - %d : %d\n&#34;, i, key);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi></span> void print_row(Row* row) {
+     printf(&#34;(%d, %s, %s)\n&#34;, row-&gt;id, row-&gt;username, row-&gt;email);
+ }
+<span class=gu>@@ -101,6 +173,8 @@ void deserialize_row(void *source, Row* destination) {
+</span><span class=gu></span>     memcpy(&amp;(destination-&gt;email), source + EMAIL_OFFSET, EMAIL_SIZE);
+ }
+ 
+<span class=gi>+void initialize_leaf_node(void* node) { *leaf_node_num_cells(node) = 0; }
+</span><span class=gi>+
+</span><span class=gi></span> void* get_page(Pager* pager, uint32_t page_num) {
+   if (page_num &gt; TABLE_MAX_PAGES) {
+     printf(&#34;Tried to fetch page number out of bounds. %d &gt; %d\n&#34;, page_num,
+<span class=gu>@@ -128,6 +202,10 @@ void* get_page(Pager* pager, uint32_t page_num) {
+</span><span class=gu></span>     }
+ 
+     pager-&gt;pages[page_num] = page;
+<span class=gi>+
+</span><span class=gi>+    if (page_num &gt;= pager-&gt;num_pages) {
+</span><span class=gi>+      pager-&gt;num_pages = page_num + 1;
+</span><span class=gi>+    }
+</span><span class=gi></span>   }
+ 
+   return pager-&gt;pages[page_num];
+<span class=gu>@@ -136,8 +214,12 @@ void* get_page(Pager* pager, uint32_t page_num) {
+</span><span class=gu></span> Cursor* table_start(Table* table) {
+   Cursor* cursor = malloc(sizeof(Cursor));
+   cursor-&gt;table = table;
+<span class=gd>-  cursor-&gt;row_num = 0;
+</span><span class=gd>-  cursor-&gt;end_of_table = (table-&gt;num_rows == 0);
+</span><span class=gd></span><span class=gi>+  cursor-&gt;page_num = table-&gt;root_page_num;
+</span><span class=gi>+  cursor-&gt;cell_num = 0;
+</span><span class=gi>+
+</span><span class=gi>+  void* root_node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(root_node);
+</span><span class=gi>+  cursor-&gt;end_of_table = (num_cells == 0);
+</span><span class=gi></span> 
+   return cursor;
+ }
+<span class=gu>@@ -145,24 +227,28 @@ Cursor* table_start(Table* table) {
+</span><span class=gu></span> Cursor* table_end(Table* table) {
+   Cursor* cursor = malloc(sizeof(Cursor));
+   cursor-&gt;table = table;
+<span class=gd>-  cursor-&gt;row_num = table-&gt;num_rows;
+</span><span class=gd></span><span class=gi>+  cursor-&gt;page_num = table-&gt;root_page_num;
+</span><span class=gi>+
+</span><span class=gi>+  void* root_node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(root_node);
+</span><span class=gi>+  cursor-&gt;cell_num = num_cells;
+</span><span class=gi></span>   cursor-&gt;end_of_table = true;
+ 
+   return cursor;
+ }
+ 
+ void* cursor_value(Cursor* cursor) {
+<span class=gd>-  uint32_t row_num = cursor-&gt;row_num;
+</span><span class=gd>-  uint32_t page_num = row_num / ROWS_PER_PAGE;
+</span><span class=gd></span><span class=gi>+  uint32_t page_num = cursor-&gt;page_num;
+</span><span class=gi></span>   void* page = get_page(cursor-&gt;table-&gt;pager, page_num);
+<span class=gd>-  uint32_t row_offset = row_num % ROWS_PER_PAGE;
+</span><span class=gd>-  uint32_t byte_offset = row_offset * ROW_SIZE;
+</span><span class=gd>-  return page + byte_offset;
+</span><span class=gd></span><span class=gi>+  return leaf_node_value(page, cursor-&gt;cell_num);
+</span><span class=gi></span> }
+ 
+ void cursor_advance(Cursor* cursor) {
+<span class=gd>-  cursor-&gt;row_num += 1;
+</span><span class=gd>-  if (cursor-&gt;row_num &gt;= cursor-&gt;table-&gt;num_rows) {
+</span><span class=gd></span><span class=gi>+  uint32_t page_num = cursor-&gt;page_num;
+</span><span class=gi>+  void* node = get_page(cursor-&gt;table-&gt;pager, page_num);
+</span><span class=gi>+
+</span><span class=gi>+  cursor-&gt;cell_num += 1;
+</span><span class=gi>+  if (cursor-&gt;cell_num &gt;= (*leaf_node_num_cells(node))) {
+</span><span class=gi></span>     cursor-&gt;end_of_table = true;
+   }
+ }
+<span class=gu>@@ -185,6 +271,12 @@ Pager* pager_open(const char* filename) {
+</span><span class=gu></span>   Pager* pager = malloc(sizeof(Pager));
+   pager-&gt;file_descriptor = fd;
+   pager-&gt;file_length = file_length;
+<span class=gi>+  pager-&gt;num_pages = (file_length / PAGE_SIZE);
+</span><span class=gi>+
+</span><span class=gi>+  if (file_length % PAGE_SIZE != 0) {
+</span><span class=gi>+    printf(&#34;Db file is not a whole number of pages. Corrupt file.\n&#34;);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  }
+</span><span class=gi></span> 
+   for (uint32_t i = 0; i &lt; TABLE_MAX_PAGES; i++) {
+     pager-&gt;pages[i] = NULL;
+<span class=gu>@@ -194,11 +285,15 @@ Pager* pager_open(const char* filename) {
+</span><span class=gu>@@ -195,11 +287,16 @@ Pager* pager_open(const char* filename) {
+</span><span class=gu></span> 
+ Table* db_open(const char* filename) {
+   Pager* pager = pager_open(filename);
+<span class=gd>-  uint32_t num_rows = pager-&gt;file_length / ROW_SIZE;
+</span><span class=gd></span> 
+   Table* table = malloc(sizeof(Table));
+   table-&gt;pager = pager;
+<span class=gd>-  table-&gt;num_rows = num_rows;
+</span><span class=gd></span><span class=gi>+  table-&gt;root_page_num = 0;
+</span><span class=gi>+
+</span><span class=gi>+  if (pager-&gt;num_pages == 0) {
+</span><span class=gi>+    // New database file. Initialize page 0 as leaf node.
+</span><span class=gi>+    void* root_node = get_page(pager, 0);
+</span><span class=gi>+    initialize_leaf_node(root_node);
+</span><span class=gi>+  }
+</span><span class=gi></span> 
+   return table;
+ }
+<span class=gu>@@ -234,7 +331,7 @@ void close_input_buffer(InputBuffer* input_buffer) {
+</span><span class=gu></span>     free(input_buffer);
+ }
+ 
+<span class=gd>-void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gd></span><span class=gi>+void pager_flush(Pager* pager, uint32_t page_num) {
+</span><span class=gi></span>   if (pager-&gt;pages[page_num] == NULL) {
+     printf(&#34;Tried to flush null page\n&#34;);
+     exit(EXIT_FAILURE);
+<span class=gu>@@ -242,7 +337,7 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gu>@@ -249,7 +346,7 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gu></span>   }
+ 
+   ssize_t bytes_written =
+<span class=gd>-      write(pager-&gt;file_descriptor, pager-&gt;pages[page_num], size);
+</span><span class=gd></span><span class=gi>+      write(pager-&gt;file_descriptor, pager-&gt;pages[page_num], PAGE_SIZE);
+</span><span class=gi></span> 
+   if (bytes_written == -1) {
+     printf(&#34;Error writing: %d\n&#34;, errno);
+<span class=gu>@@ -252,29 +347,16 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gu>@@ -260,29 +357,16 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
+</span><span class=gu></span> 
+ void db_close(Table* table) {
+   Pager* pager = table-&gt;pager;
+<span class=gd>-  uint32_t num_full_pages = table-&gt;num_rows / ROWS_PER_PAGE;
+</span><span class=gd></span> 
+<span class=gd>-  for (uint32_t i = 0; i &lt; num_full_pages; i++) {
+</span><span class=gd></span><span class=gi>+  for (uint32_t i = 0; i &lt; pager-&gt;num_pages; i++) {
+</span><span class=gi></span>     if (pager-&gt;pages[i] == NULL) {
+       continue;
+     }
+<span class=gd>-    pager_flush(pager, i, PAGE_SIZE);
+</span><span class=gd></span><span class=gi>+    pager_flush(pager, i);
+</span><span class=gi></span>     free(pager-&gt;pages[i]);
+     pager-&gt;pages[i] = NULL;
+   }
+ 
+<span class=gd>-  // There may be a partial page to write to the end of the file
+</span><span class=gd>-  // This should not be needed after we switch to a B-tree
+</span><span class=gd>-  uint32_t num_additional_rows = table-&gt;num_rows % ROWS_PER_PAGE;
+</span><span class=gd>-  if (num_additional_rows &gt; 0) {
+</span><span class=gd>-    uint32_t page_num = num_full_pages;
+</span><span class=gd>-    if (pager-&gt;pages[page_num] != NULL) {
+</span><span class=gd>-      pager_flush(pager, page_num, num_additional_rows * ROW_SIZE);
+</span><span class=gd>-      free(pager-&gt;pages[page_num]);
+</span><span class=gd>-      pager-&gt;pages[page_num] = NULL;
+</span><span class=gd>-    }
+</span><span class=gd>-  }
+</span><span class=gd>-
+</span><span class=gd></span>   int result = close(pager-&gt;file_descriptor);
+   if (result == -1) {
+     printf(&#34;Error closing db file.\n&#34;);
+<span class=gu>@@ -305,6 +389,14 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table *table) {
+</span><span class=gu></span>   if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
+     db_close(table);
+     exit(EXIT_SUCCESS);
+<span class=gi>+  } else if (strcmp(input_buffer-&gt;buffer, &#34;.btree&#34;) == 0) {
+</span><span class=gi>+    printf(&#34;Tree:\n&#34;);
+</span><span class=gi>+    print_leaf_node(get_page(table-&gt;pager, 0));
+</span><span class=gi>+    return META_COMMAND_SUCCESS;
+</span><span class=gi>+  } else if (strcmp(input_buffer-&gt;buffer, &#34;.constants&#34;) == 0) {
+</span><span class=gi>+    printf(&#34;Constants:\n&#34;);
+</span><span class=gi>+    print_constants();
+</span><span class=gi>+    return META_COMMAND_SUCCESS;
+</span><span class=gi></span>   } else {
+     return META_COMMAND_UNRECOGNIZED_COMMAND;
+   }
+<span class=gu>@@ -354,16 +446,39 @@ PrepareResult prepare_statement(InputBuffer* input_buffer,
+</span><span class=gu></span>   return PREPARE_UNRECOGNIZED_STATEMENT;
+ }
+ 
+<span class=gi>+void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
+</span><span class=gi>+  void* node = get_page(cursor-&gt;table-&gt;pager, cursor-&gt;page_num);
+</span><span class=gi>+
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gi>+  if (num_cells &gt;= LEAF_NODE_MAX_CELLS) {
+</span><span class=gi>+    // Node full
+</span><span class=gi>+    printf(&#34;Need to implement splitting a leaf node.\n&#34;);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  }
+</span><span class=gi>+
+</span><span class=gi>+  if (cursor-&gt;cell_num &lt; num_cells) {
+</span><span class=gi>+    // Make room for new cell
+</span><span class=gi>+    for (uint32_t i = num_cells; i &gt; cursor-&gt;cell_num; i--) {
+</span><span class=gi>+      memcpy(leaf_node_cell(node, i), leaf_node_cell(node, i - 1),
+</span><span class=gi>+             LEAF_NODE_CELL_SIZE);
+</span><span class=gi>+    }
+</span><span class=gi>+  }
+</span><span class=gi>+
+</span><span class=gi>+  *(leaf_node_num_cells(node)) += 1;
+</span><span class=gi>+  *(leaf_node_key(node, cursor-&gt;cell_num)) = key;
+</span><span class=gi>+  serialize_row(value, leaf_node_value(node, cursor-&gt;cell_num));
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi></span> ExecuteResult execute_insert(Statement* statement, Table* table) {
+<span class=gd>-  if (table-&gt;num_rows &gt;= TABLE_MAX_ROWS) {
+</span><span class=gd></span><span class=gi>+  void* node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gi>+  if ((*leaf_node_num_cells(node) &gt;= LEAF_NODE_MAX_CELLS)) {
+</span><span class=gi></span>     return EXECUTE_TABLE_FULL;
+   }
+ 
+   Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
+   Cursor* cursor = table_end(table);
+ 
+<span class=gd>-  serialize_row(row_to_insert, cursor_value(cursor));
+</span><span class=gd>-  table-&gt;num_rows += 1;
+</span><span class=gd></span><span class=gi>+  leaf_node_insert(cursor, row_to_insert-&gt;id, row_to_insert);
+</span><span class=gi></span> 
+   free(cursor);
+</code></pre></div><p>And the specs:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  it &#39;allows printing out the structure of a one-node btree&#39; do
+</span><span class=gi>+    script = [3, 1, 2].map do |i|
+</span><span class=gi>+      &#34;insert #{i} user#{i} person#{i}@example.com&#34;
+</span><span class=gi>+    end
+</span><span class=gi>+    script &lt;&lt; &#34;.btree&#34;
+</span><span class=gi>+    script &lt;&lt; &#34;.exit&#34;
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+
+</span><span class=gi>+    expect(result).to match_array([
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Tree:&#34;,
+</span><span class=gi>+      &#34;leaf (size 3)&#34;,
+</span><span class=gi>+      &#34;  - 0 : 3&#34;,
+</span><span class=gi>+      &#34;  - 1 : 1&#34;,
+</span><span class=gi>+      &#34;  - 2 : 2&#34;,
+</span><span class=gi>+      &#34;db &gt; &#34;
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span><span class=gi>+
+</span><span class=gi>+  it &#39;prints constants&#39; do
+</span><span class=gi>+    script = [
+</span><span class=gi>+      &#34;.constants&#34;,
+</span><span class=gi>+      &#34;.exit&#34;,
+</span><span class=gi>+    ]
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+
+</span><span class=gi>+    expect(result).to match_array([
+</span><span class=gi>+      &#34;db &gt; Constants:&#34;,
+</span><span class=gi>+      &#34;ROW_SIZE: 293&#34;,
+</span><span class=gi>+      &#34;COMMON_NODE_HEADER_SIZE: 6&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_HEADER_SIZE: 10&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_CELL_SIZE: 297&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_SPACE_FOR_CELLS: 4086&#34;,
+</span><span class=gi>+      &#34;LEAF_NODE_MAX_CELLS: 13&#34;,
+</span><span class=gi>+      &#34;db &gt; &#34;,
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span><span class=gi></span> end
+</code></pre></div><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part8.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part7/ title="Part 7 - Introduction to the B-Tree"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 7 - Introduction to the B-Tree</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part9/ title="Part 9 - Binary Search and Duplicate Keys">Next - Part 9 - Binary Search and Duplicate Keys <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>

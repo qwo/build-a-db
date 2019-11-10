@@ -1,0 +1,179 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part2/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</h1><p>We&rsquo;re making a clone of sqlite. The &ldquo;front-end&rdquo; of sqlite is a SQL compiler that parses a string and outputs an internal representation called bytecode.</p><p>This bytecode is passed to the virtual machine, which executes it.</p><p>{% include image.html url=&ldquo;assets/images/arch2.gif&rdquo; description=&ldquo;SQLite Architecture (<a href='https://www.sqlite.org/arch.html)"'>https://www.sqlite.org/arch.html)&quot;</a> %}</p><p>Breaking things into two steps like this has a couple advantages:
+- Reduces the complexity of each part (e.g. virtual machine does not worry about syntax errors)
+- Allows compiling common queries once and caching the bytecode for improved performance</p><p>With this in mind, let&rsquo;s refactor our <code>main</code> function and support two new keywords in the process:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> int main(int argc, char* argv[]) {
+   InputBuffer* input_buffer = new_input_buffer();
+   while (true) {
+     print_prompt();
+     read_input(input_buffer);
+
+<span class=gd>-    if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
+</span><span class=gd>-      exit(EXIT_SUCCESS);
+</span><span class=gd>-    } else {
+</span><span class=gd>-      printf(&#34;Unrecognized command &#39;%s&#39;.\n&#34;, input_buffer-&gt;buffer);
+</span><span class=gd></span><span class=gi>+    if (input_buffer-&gt;buffer[0] == &#39;.&#39;) {
+</span><span class=gi>+      switch (do_meta_command(input_buffer)) {
+</span><span class=gi>+        case (META_COMMAND_SUCCESS):
+</span><span class=gi>+          continue;
+</span><span class=gi>+        case (META_COMMAND_UNRECOGNIZED_COMMAND):
+</span><span class=gi>+          printf(&#34;Unrecognized command &#39;%s&#39;\n&#34;, input_buffer-&gt;buffer);
+</span><span class=gi>+          continue;
+</span><span class=gi>+      }
+</span><span class=gi></span>     }
+<span class=gi>+
+</span><span class=gi>+    Statement statement;
+</span><span class=gi>+    switch (prepare_statement(input_buffer, &amp;statement)) {
+</span><span class=gi>+      case (PREPARE_SUCCESS):
+</span><span class=gi>+        break;
+</span><span class=gi>+      case (PREPARE_UNRECOGNIZED_STATEMENT):
+</span><span class=gi>+        printf(&#34;Unrecognized keyword at start of &#39;%s&#39;.\n&#34;,
+</span><span class=gi>+               input_buffer-&gt;buffer);
+</span><span class=gi>+        continue;
+</span><span class=gi>+    }
+</span><span class=gi>+
+</span><span class=gi>+    execute_statement(&amp;statement);
+</span><span class=gi>+    printf(&#34;Executed.\n&#34;);
+</span><span class=gi></span>   }
+ }
+</code></pre></div><p>Non-SQL statements like <code>.exit</code> are called &ldquo;meta-commands&rdquo;. They all start with a dot, so we check for them and handle them in a separate function.</p><p>Next, we add a step that converts the line of input into our internal representation of a statement. This is our hacky version of the sqlite front-end.</p><p>Lastly, we pass the prepared statement to <code>execute_statement</code>. This function will eventually become our virtual machine.</p><p>Notice that two of our new functions return enums indicating success or failure:</p><div class=highlight><pre class=chroma><code class=language-c data-lang=c><span class=k>typedef</span> <span class=k>enum</span> <span class=p>{</span>
+  <span class=n>META_COMMAND_SUCCESS</span><span class=p>,</span>
+  <span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span>
+<span class=p>}</span> <span class=n>MetaCommandResult</span><span class=p>;</span>
+
+<span class=k>typedef</span> <span class=k>enum</span> <span class=p>{</span> <span class=n>PREPARE_SUCCESS</span><span class=p>,</span> <span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span> <span class=p>}</span> <span class=n>PrepareResult</span><span class=p>;</span></code></pre></div><p>&ldquo;Unrecognized statement&rdquo;? That seems a bit like an exception. But <a href="https://www.youtube.com/watch?v=EVhCUSgNbzo">exceptions are bad</a> (and C doesn&rsquo;t even support them), so I&rsquo;m using enum result codes wherever practical. The C compiler will complain if my switch statement doesn&rsquo;t handle a member of the enum, so we can feel a little more confident we handle every result of a function. Expect more result codes to be added in the future.</p><p><code>do_meta_command</code> is just a wrapper for existing functionality that leaves room for more commands:</p><div class=highlight><pre class=chroma><code class=language-c data-lang=c><span class=n>MetaCommandResult</span> <span class=nf>do_meta_command</span><span class=p>(</span><span class=n>InputBuffer</span><span class=o>*</span> <span class=n>input_buffer</span><span class=p>)</span> <span class=p>{</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>strcmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;.exit&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+    <span class=n>exit</span><span class=p>(</span><span class=n>EXIT_SUCCESS</span><span class=p>);</span>
+  <span class=p>}</span> <span class=k>else</span> <span class=p>{</span>
+    <span class=k>return</span> <span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span><span class=p>;</span>
+  <span class=p>}</span>
+<span class=p>}</span></code></pre></div><p>Our &ldquo;prepared statement&rdquo; right now just contains an enum with two possible values. It will contain more data as we allow parameters in statements:</p><div class=highlight><pre class=chroma><code class=language-c data-lang=c><span class=k>typedef</span> <span class=k>enum</span> <span class=p>{</span> <span class=n>STATEMENT_INSERT</span><span class=p>,</span> <span class=n>STATEMENT_SELECT</span> <span class=p>}</span> <span class=n>StatementType</span><span class=p>;</span>
+
+<span class=k>typedef</span> <span class=k>struct</span> <span class=p>{</span>
+  <span class=n>StatementType</span> <span class=n>type</span><span class=p>;</span>
+<span class=p>}</span> <span class=n>Statement</span><span class=p>;</span></code></pre></div><p><code>prepare_statement</code> (our &ldquo;SQL Compiler&rdquo;) does not understand SQL right now. In fact, it only understands two words:</p><div class=highlight><pre class=chroma><code class=language-c data-lang=c><span class=n>PrepareResult</span> <span class=nf>prepare_statement</span><span class=p>(</span><span class=n>InputBuffer</span><span class=o>*</span> <span class=n>input_buffer</span><span class=p>,</span>
+                                <span class=n>Statement</span><span class=o>*</span> <span class=n>statement</span><span class=p>)</span> <span class=p>{</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>strncmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;insert&#34;</span><span class=p>,</span> <span class=mi>6</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+    <span class=n>statement</span><span class=o>-&gt;</span><span class=n>type</span> <span class=o>=</span> <span class=n>STATEMENT_INSERT</span><span class=p>;</span>
+    <span class=k>return</span> <span class=n>PREPARE_SUCCESS</span><span class=p>;</span>
+  <span class=p>}</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>strcmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;select&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+    <span class=n>statement</span><span class=o>-&gt;</span><span class=n>type</span> <span class=o>=</span> <span class=n>STATEMENT_SELECT</span><span class=p>;</span>
+    <span class=k>return</span> <span class=n>PREPARE_SUCCESS</span><span class=p>;</span>
+  <span class=p>}</span>
+
+  <span class=k>return</span> <span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>;</span>
+<span class=p>}</span></code></pre></div><p>Note that we use <code>strncmp</code> for &ldquo;insert&rdquo; since the &ldquo;insert&rdquo; keyword will be followed by data. (e.g. <code>insert 1 cstack foo@bar.com</code>)</p><p>Lastly, <code>execute_statement</code> contains a few stubs:</p><div class=highlight><pre class=chroma><code class=language-c data-lang=c><span class=kt>void</span> <span class=nf>execute_statement</span><span class=p>(</span><span class=n>Statement</span><span class=o>*</span> <span class=n>statement</span><span class=p>)</span> <span class=p>{</span>
+  <span class=k>switch</span> <span class=p>(</span><span class=n>statement</span><span class=o>-&gt;</span><span class=n>type</span><span class=p>)</span> <span class=p>{</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>STATEMENT_INSERT</span><span class=p>)</span><span class=o>:</span>
+      <span class=n>printf</span><span class=p>(</span><span class=s>&#34;This is where we would do an insert.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+      <span class=k>break</span><span class=p>;</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>STATEMENT_SELECT</span><span class=p>)</span><span class=o>:</span>
+      <span class=n>printf</span><span class=p>(</span><span class=s>&#34;This is where we would do a select.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+      <span class=k>break</span><span class=p>;</span>
+  <span class=p>}</span>
+<span class=p>}</span></code></pre></div><p>Note that it doesn&rsquo;t return any error codes because there&rsquo;s nothing that could go wrong yet.</p><p>With these refactors, we now recognize two new keywords!</p><div class=highlight><pre class=chroma><code class=language-command-line data-lang=command-line>~ ./db
+db &gt; insert foo bar
+This is where we would do an insert.
+Executed.
+db &gt; delete foo
+Unrecognized keyword at start of &#39;delete foo&#39;.
+db &gt; select
+This is where we would do a select.
+Executed.
+db &gt; .tables
+Unrecognized command &#39;.tables&#39;
+db &gt; .exit
+~</code></pre></div><p>The skeleton of our database is taking shape&hellip; wouldn&rsquo;t it be nice if it stored data? In the next part, we&rsquo;ll implement <code>insert</code> and <code>select</code>, creating the world&rsquo;s worst data store. In the mean time, here&rsquo;s the entire diff from this part:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -10,6 +10,23 @@ struct InputBuffer_t {
+</span><span class=gu></span> } InputBuffer;
+ 
+<span class=gi>+typedef enum {
+</span><span class=gi>+  META_COMMAND_SUCCESS,
+</span><span class=gi>+  META_COMMAND_UNRECOGNIZED_COMMAND
+</span><span class=gi>+} MetaCommandResult;
+</span><span class=gi>+
+</span><span class=gi>+typedef enum { PREPARE_SUCCESS, PREPARE_UNRECOGNIZED_STATEMENT } PrepareResult;
+</span><span class=gi>+
+</span><span class=gi>+typedef enum { STATEMENT_INSERT, STATEMENT_SELECT } StatementType;
+</span><span class=gi>+
+</span><span class=gi>+typedef struct {
+</span><span class=gi>+  StatementType type;
+</span><span class=gi>+} Statement;
+</span><span class=gi>+
+</span><span class=gi></span> InputBuffer* new_input_buffer() {
+   InputBuffer* input_buffer = malloc(sizeof(InputBuffer));
+   input_buffer-&gt;buffer = NULL;
+<span class=gu>@@ -40,17 +57,67 @@ void close_input_buffer(InputBuffer* input_buffer) {
+</span><span class=gu></span>     free(input_buffer);
+ }
+ 
+<span class=gi>+MetaCommandResult do_meta_command(InputBuffer* input_buffer) {
+</span><span class=gi>+  if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
+</span><span class=gi>+    close_input_buffer(input_buffer);
+</span><span class=gi>+    exit(EXIT_SUCCESS);
+</span><span class=gi>+  } else {
+</span><span class=gi>+    return META_COMMAND_UNRECOGNIZED_COMMAND;
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+PrepareResult prepare_statement(InputBuffer* input_buffer,
+</span><span class=gi>+                                Statement* statement) {
+</span><span class=gi>+  if (strncmp(input_buffer-&gt;buffer, &#34;insert&#34;, 6) == 0) {
+</span><span class=gi>+    statement-&gt;type = STATEMENT_INSERT;
+</span><span class=gi>+    return PREPARE_SUCCESS;
+</span><span class=gi>+  }
+</span><span class=gi>+  if (strcmp(input_buffer-&gt;buffer, &#34;select&#34;) == 0) {
+</span><span class=gi>+    statement-&gt;type = STATEMENT_SELECT;
+</span><span class=gi>+    return PREPARE_SUCCESS;
+</span><span class=gi>+  }
+</span><span class=gi>+
+</span><span class=gi>+  return PREPARE_UNRECOGNIZED_STATEMENT;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void execute_statement(Statement* statement) {
+</span><span class=gi>+  switch (statement-&gt;type) {
+</span><span class=gi>+    case (STATEMENT_INSERT):
+</span><span class=gi>+      printf(&#34;This is where we would do an insert.\n&#34;);
+</span><span class=gi>+      break;
+</span><span class=gi>+    case (STATEMENT_SELECT):
+</span><span class=gi>+      printf(&#34;This is where we would do a select.\n&#34;);
+</span><span class=gi>+      break;
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi></span> int main(int argc, char* argv[]) {
+   InputBuffer* input_buffer = new_input_buffer();
+   while (true) {
+     print_prompt();
+     read_input(input_buffer);
+ 
+<span class=gd>-    if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
+</span><span class=gd>-      close_input_buffer(input_buffer);
+</span><span class=gd>-      exit(EXIT_SUCCESS);
+</span><span class=gd>-    } else {
+</span><span class=gd>-      printf(&#34;Unrecognized command &#39;%s&#39;.\n&#34;, input_buffer-&gt;buffer);
+</span><span class=gd></span><span class=gi>+    if (input_buffer-&gt;buffer[0] == &#39;.&#39;) {
+</span><span class=gi>+      switch (do_meta_command(input_buffer)) {
+</span><span class=gi>+        case (META_COMMAND_SUCCESS):
+</span><span class=gi>+          continue;
+</span><span class=gi>+        case (META_COMMAND_UNRECOGNIZED_COMMAND):
+</span><span class=gi>+          printf(&#34;Unrecognized command &#39;%s&#39;\n&#34;, input_buffer-&gt;buffer);
+</span><span class=gi>+          continue;
+</span><span class=gi>+      }
+</span><span class=gi></span>     }
+<span class=gi>+
+</span><span class=gi>+    Statement statement;
+</span><span class=gi>+    switch (prepare_statement(input_buffer, &amp;statement)) {
+</span><span class=gi>+      case (PREPARE_SUCCESS):
+</span><span class=gi>+        break;
+</span><span class=gi>+      case (PREPARE_UNRECOGNIZED_STATEMENT):
+</span><span class=gi>+        printf(&#34;Unrecognized keyword at start of &#39;%s&#39;.\n&#34;,
+</span><span class=gi>+               input_buffer-&gt;buffer);
+</span><span class=gi>+        continue;
+</span><span class=gi>+    }
+</span><span class=gi>+
+</span><span class=gi>+    execute_statement(&amp;statement);
+</span><span class=gi>+    printf(&#34;Executed.\n&#34;);
+</span><span class=gi></span>   }
+ }
+</code></pre></div><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part2.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part1/ title="Part 1 - Introduction and Setting up the REPL"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 1 - Introduction and Setting up the REPL</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part3/ title="Part 3 - An In-Memory, Append-Only, Single-Table Database">Next - Part 3 - An In-Memory, Append-Only, Single-Table Database <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>

@@ -1,0 +1,170 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 12 - Scanning a Multi-Level B-Tree - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part12/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 12 - Scanning a Multi-Level B-Tree</h1><p>We now support constructing a multi-level btree, but we&rsquo;ve broken <code>select</code> statements in the process. Here&rsquo;s a test case that inserts 15 rows and then tries to print them.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  it &#39;prints all rows in a multi-level tree&#39; do
+</span><span class=gi>+    script = []
+</span><span class=gi>+    (1..15).each do |i|
+</span><span class=gi>+      script &lt;&lt; &#34;insert #{i} user#{i} person#{i}@example.com&#34;
+</span><span class=gi>+    end
+</span><span class=gi>+    script &lt;&lt; &#34;select&#34;
+</span><span class=gi>+    script &lt;&lt; &#34;.exit&#34;
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+
+</span><span class=gi>+    expect(result[15...result.length]).to match_array([
+</span><span class=gi>+      &#34;db &gt; (1, user1, person1@example.com)&#34;,
+</span><span class=gi>+      &#34;(2, user2, person2@example.com)&#34;,
+</span><span class=gi>+      &#34;(3, user3, person3@example.com)&#34;,
+</span><span class=gi>+      &#34;(4, user4, person4@example.com)&#34;,
+</span><span class=gi>+      &#34;(5, user5, person5@example.com)&#34;,
+</span><span class=gi>+      &#34;(6, user6, person6@example.com)&#34;,
+</span><span class=gi>+      &#34;(7, user7, person7@example.com)&#34;,
+</span><span class=gi>+      &#34;(8, user8, person8@example.com)&#34;,
+</span><span class=gi>+      &#34;(9, user9, person9@example.com)&#34;,
+</span><span class=gi>+      &#34;(10, user10, person10@example.com)&#34;,
+</span><span class=gi>+      &#34;(11, user11, person11@example.com)&#34;,
+</span><span class=gi>+      &#34;(12, user12, person12@example.com)&#34;,
+</span><span class=gi>+      &#34;(13, user13, person13@example.com)&#34;,
+</span><span class=gi>+      &#34;(14, user14, person14@example.com)&#34;,
+</span><span class=gi>+      &#34;(15, user15, person15@example.com)&#34;,
+</span><span class=gi>+      &#34;Executed.&#34;, &#34;db &gt; &#34;,
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span></code></pre></div><p>But when we run that test case right now, what actually happens is:</p><pre><code>db &gt; select
+(2, user1, person1@example.com)
+Executed.
+</code></pre><p>That&rsquo;s weird. It&rsquo;s only printing one row, and that row looks corrupted (notice the id doesn&rsquo;t match the username).</p><p>The weirdness is because <code>execute_select()</code> begins at the start of the table, and our current implementation of <code>table_start()</code> returns cell 0 of the root node. But the root of our tree is now an internal node which doesn&rsquo;t contain any rows. The data that was printed must have been left over from when the root node was a leaf. <code>execute_select()</code> should really return cell 0 of the leftmost leaf node.</p><p>So get rid of the old implementation:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-Cursor* table_start(Table* table) {
+</span><span class=gd>-  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gd>-  cursor-&gt;table = table;
+</span><span class=gd>-  cursor-&gt;page_num = table-&gt;root_page_num;
+</span><span class=gd>-  cursor-&gt;cell_num = 0;
+</span><span class=gd>-
+</span><span class=gd>-  void* root_node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gd>-  uint32_t num_cells = *leaf_node_num_cells(root_node);
+</span><span class=gd>-  cursor-&gt;end_of_table = (num_cells == 0);
+</span><span class=gd>-
+</span><span class=gd>-  return cursor;
+</span><span class=gd>-}
+</span></code></pre></div><p>And add a new implementation that searches for key 0 (the minimum possible key). Even if key 0 does not exist in the table, this method will return the position of the lowest id (the start of the left-most leaf node).</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+Cursor* table_start(Table* table) {
+</span><span class=gi>+  Cursor* cursor =  table_find(table, 0);
+</span><span class=gi>+
+</span><span class=gi>+  void* node = get_page(table-&gt;pager, cursor-&gt;page_num);
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gi>+  cursor-&gt;end_of_table = (num_cells == 0);
+</span><span class=gi>+
+</span><span class=gi>+  return cursor;
+</span><span class=gi>+}
+</span></code></pre></div><p>With those changes, it still only prints out one node&rsquo;s worth of rows:</p><pre><code>db &gt; select
+(1, user1, person1@example.com)
+(2, user2, person2@example.com)
+(3, user3, person3@example.com)
+(4, user4, person4@example.com)
+(5, user5, person5@example.com)
+(6, user6, person6@example.com)
+(7, user7, person7@example.com)
+Executed.
+db &gt;
+</code></pre><p>With 15 entries, our btree consists of one internal node and two leaf nodes, which looks something like this:</p><p>{% include image.html url=&ldquo;assets/images/btree3.png&rdquo; description=&ldquo;structure of our btree&rdquo; %}</p><p>To scan the entire table, we need to jump to the second leaf node after we reach the end of the first. To do that, we&rsquo;re going to save a new field in the leaf node header called &ldquo;next_leaf&rdquo;, which will hold the page number of the leaf&rsquo;s sibling node on the right. The rightmost leaf node will have a <code>next_leaf</code> value of 0 to denote no sibling (page 0 is reserved for the root node of the table anyway).</p><p>Update the leaf node header format to include the new field:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff> const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
+ const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE;
+<span class=gd>-const uint32_t LEAF_NODE_HEADER_SIZE =
+</span><span class=gd>-    COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+</span><span class=gd></span><span class=gi>+const uint32_t LEAF_NODE_NEXT_LEAF_SIZE = sizeof(uint32_t);
+</span><span class=gi>+const uint32_t LEAF_NODE_NEXT_LEAF_OFFSET =
+</span><span class=gi>+    LEAF_NODE_NUM_CELLS_OFFSET + LEAF_NODE_NUM_CELLS_SIZE;
+</span><span class=gi>+const uint32_t LEAF_NODE_HEADER_SIZE = COMMON_NODE_HEADER_SIZE +
+</span><span class=gi>+                                       LEAF_NODE_NUM_CELLS_SIZE +
+</span><span class=gi>+                                       LEAF_NODE_NEXT_LEAF_SIZE;
+</span><span class=gi></span> 
+</code></pre></div><p>Add a method to access the new field:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+uint32_t* leaf_node_next_leaf(void* node) {
+</span><span class=gi>+  return node + LEAF_NODE_NEXT_LEAF_OFFSET;
+</span><span class=gi>+}
+</span></code></pre></div><p>Set <code>next_leaf</code> to 0 by default when initializing a new leaf node:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -322,6 +330,7 @@ void initialize_leaf_node(void* node) {
+</span><span class=gu></span>   set_node_type(node, NODE_LEAF);
+   set_node_root(node, false);
+   *leaf_node_num_cells(node) = 0;
+<span class=gi>+  *leaf_node_next_leaf(node) = 0;  // 0 represents no sibling
+</span><span class=gi></span> }
+</code></pre></div><p>Whenever we split a leaf node, update the sibling pointers. The old leaf&rsquo;s sibling becomes the new leaf, and the new leaf&rsquo;s sibling becomes whatever used to be the old leaf&rsquo;s sibling.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -659,6 +671,8 @@ void leaf_node_split_and_insert(Cursor* cursor, uint32_t key, Row* value) {
+</span><span class=gu></span>   uint32_t new_page_num = get_unused_page_num(cursor-&gt;table-&gt;pager);
+   void* new_node = get_page(cursor-&gt;table-&gt;pager, new_page_num);
+   initialize_leaf_node(new_node);
+<span class=gi>+  *leaf_node_next_leaf(new_node) = *leaf_node_next_leaf(old_node);
+</span><span class=gi>+  *leaf_node_next_leaf(old_node) = new_page_num;
+</span></code></pre></div><p>Adding a new field changes a few constants:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>   it &#39;prints constants&#39; do
+     script = [
+       &#34;.constants&#34;,
+<span class=gu>@@ -199,9 +228,9 @@ describe &#39;database&#39; do
+</span><span class=gu></span>       &#34;db &gt; Constants:&#34;,
+       &#34;ROW_SIZE: 293&#34;,
+       &#34;COMMON_NODE_HEADER_SIZE: 6&#34;,
+<span class=gd>-      &#34;LEAF_NODE_HEADER_SIZE: 10&#34;,
+</span><span class=gd></span><span class=gi>+      &#34;LEAF_NODE_HEADER_SIZE: 14&#34;,
+</span><span class=gi></span>       &#34;LEAF_NODE_CELL_SIZE: 297&#34;,
+<span class=gd>-      &#34;LEAF_NODE_SPACE_FOR_CELLS: 4086&#34;,
+</span><span class=gd></span><span class=gi>+      &#34;LEAF_NODE_SPACE_FOR_CELLS: 4082&#34;,
+</span><span class=gi></span>       &#34;LEAF_NODE_MAX_CELLS: 13&#34;,
+       &#34;db &gt; &#34;,
+     ])
+</code></pre></div><p>Now whenever we want to advance the cursor past the end of a leaf node, we can check if the leaf node has a sibling. If it does, jump to it. Otherwise, we&rsquo;re at the end of the table.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -428,7 +432,15 @@ void cursor_advance(Cursor* cursor) {
+</span><span class=gu></span> 
+   cursor-&gt;cell_num += 1;
+   if (cursor-&gt;cell_num &gt;= (*leaf_node_num_cells(node))) {
+<span class=gd>-    cursor-&gt;end_of_table = true;
+</span><span class=gd></span><span class=gi>+    /* Advance to next leaf node */
+</span><span class=gi>+    uint32_t next_page_num = *leaf_node_next_leaf(node);
+</span><span class=gi>+    if (next_page_num == 0) {
+</span><span class=gi>+      /* This was rightmost leaf */
+</span><span class=gi>+      cursor-&gt;end_of_table = true;
+</span><span class=gi>+    } else {
+</span><span class=gi>+      cursor-&gt;page_num = next_page_num;
+</span><span class=gi>+      cursor-&gt;cell_num = 0;
+</span><span class=gi>+    }
+</span><span class=gi></span>   }
+ }
+</code></pre></div><p>After those changes, we actually print 15 rows&hellip;</p><pre><code>db &gt; select
+(1, user1, person1@example.com)
+(2, user2, person2@example.com)
+(3, user3, person3@example.com)
+(4, user4, person4@example.com)
+(5, user5, person5@example.com)
+(6, user6, person6@example.com)
+(7, user7, person7@example.com)
+(8, user8, person8@example.com)
+(9, user9, person9@example.com)
+(10, user10, person10@example.com)
+(11, user11, person11@example.com)
+(12, user12, person12@example.com)
+(13, user13, person13@example.com)
+(1919251317, 14, on14@example.com)
+(15, user15, person15@example.com)
+Executed.
+db &gt;
+</code></pre><p>&hellip;but one of them looks corrupted</p><pre><code>(1919251317, 14, on14@example.com)
+</code></pre><p>After some debugging, I found out it&rsquo;s because of a bug in how we split leaf nodes:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -676,7 +690,9 @@ void leaf_node_split_and_insert(Cursor* cursor, uint32_t key, Row* value) {
+</span><span class=gu></span>     void* destination = leaf_node_cell(destination_node, index_within_node);
+ 
+     if (i == cursor-&gt;cell_num) {
+<span class=gd>-      serialize_row(value, destination);
+</span><span class=gd></span><span class=gi>+      serialize_row(value,
+</span><span class=gi>+                    leaf_node_value(destination_node, index_within_node));
+</span><span class=gi>+      *leaf_node_key(destination_node, index_within_node) = key;
+</span><span class=gi></span>     } else if (i &gt; cursor-&gt;cell_num) {
+       memcpy(destination, leaf_node_cell(old_node, i - 1), LEAF_NODE_CELL_SIZE);
+     } else {
+</code></pre></div><p>Remember that each cell in a leaf node consists of first a key then a value:</p><p>{% include image.html url=&ldquo;assets/images/leaf-node-format.png&rdquo; description=&ldquo;Original leaf node format&rdquo; %}</p><p>We were writing the new row (value) into the start of the cell, where the key should go. That means part of the username was going into the section for id (hence the crazy large id).</p><p>After fixing that bug, we finally print out the entire table as expected:</p><pre><code>db &gt; select
+(1, user1, person1@example.com)
+(2, user2, person2@example.com)
+(3, user3, person3@example.com)
+(4, user4, person4@example.com)
+(5, user5, person5@example.com)
+(6, user6, person6@example.com)
+(7, user7, person7@example.com)
+(8, user8, person8@example.com)
+(9, user9, person9@example.com)
+(10, user10, person10@example.com)
+(11, user11, person11@example.com)
+(12, user12, person12@example.com)
+(13, user13, person13@example.com)
+(14, user14, person14@example.com)
+(15, user15, person15@example.com)
+Executed.
+db &gt;
+</code></pre><p>Whew! One bug after another, but we&rsquo;re making progress.</p><p>Until next time.</p><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part12.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part11/ title="Part 11 - Recursively Searching the B-Tree"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 11 - Recursively Searching the B-Tree</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part13/ title="Part 13 - Updating Parent Node After a Split">Next - Part 13 - Updating Parent Node After a Split <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>

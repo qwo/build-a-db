@@ -1,0 +1,140 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 9 - Binary Search and Duplicate Keys - Build a database in X</title><meta name=description content="put your description"><meta name=generator content="Hugo 0.58.3"><link href=stanzheng.com/build-a-dbindex.xml rel=alternate type=application/rss+xml><link rel=canonical href=stanzheng.com/build-a-db/using_c/part9/><link rel=stylesheet href=stanzheng.com/build-a-db/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=stanzheng.com/build-a-db/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=stanzheng.com/build-a-db/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 0.4.0</span>
+<a href=https://github.com/stanzheng/build_a_database class=github><i class="fab fa-github"></i></a><p class=description>put your description</p></header><div class=global-menu><nav><ul><li><a href=stanzheng.com/build-a-db/>Home</a></li><li><a href=https://twitter.com/thingsym>Twitter</a></li><li><a href=stanzheng.com/build-a-db/about/>About Hugo</a></li></ul></nav></div><div class=content-container><main><h1>Part 9 - Binary Search and Duplicate Keys</h1><p>Last time we noted that we&rsquo;re still storing keys in unsorted order. We&rsquo;re going to fix that problem, plus detect and reject duplicate keys.</p><p>Right now, our <code>execute_insert()</code> function always chooses to insert at the end of the table. Instead, we should search the table for the correct place to insert, then insert there. If the key already exists there, return an error.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>ExecuteResult execute_insert(Statement* statement, Table* table) {
+   void* node = get_page(table-&gt;pager, table-&gt;root_page_num);
+<span class=gd>-  if ((*leaf_node_num_cells(node) &gt;= LEAF_NODE_MAX_CELLS)) {
+</span><span class=gd></span><span class=gi>+  uint32_t num_cells = (*leaf_node_num_cells(node));
+</span><span class=gi>+  if (num_cells &gt;= LEAF_NODE_MAX_CELLS) {
+</span><span class=gi></span>     return EXECUTE_TABLE_FULL;
+   }
+
+   Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
+<span class=gd>-  Cursor* cursor = table_end(table);
+</span><span class=gd></span><span class=gi>+  uint32_t key_to_insert = row_to_insert-&gt;id;
+</span><span class=gi>+  Cursor* cursor = table_find(table, key_to_insert);
+</span><span class=gi>+
+</span><span class=gi>+  if (cursor-&gt;cell_num &lt; num_cells) {
+</span><span class=gi>+    uint32_t key_at_index = *leaf_node_key(node, cursor-&gt;cell_num);
+</span><span class=gi>+    if (key_at_index == key_to_insert) {
+</span><span class=gi>+      return EXECUTE_DUPLICATE_KEY;
+</span><span class=gi>+    }
+</span><span class=gi>+  }
+</span><span class=gi></span>
+   leaf_node_insert(cursor, row_to_insert-&gt;id, row_to_insert);
+</code></pre></div><p>We don&rsquo;t need the <code>table_end()</code> function anymore.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-Cursor* table_end(Table* table) {
+</span><span class=gd>-  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gd>-  cursor-&gt;table = table;
+</span><span class=gd>-  cursor-&gt;page_num = table-&gt;root_page_num;
+</span><span class=gd>-
+</span><span class=gd>-  void* root_node = get_page(table-&gt;pager, table-&gt;root_page_num);
+</span><span class=gd>-  uint32_t num_cells = *leaf_node_num_cells(root_node);
+</span><span class=gd>-  cursor-&gt;cell_num = num_cells;
+</span><span class=gd>-  cursor-&gt;end_of_table = true;
+</span><span class=gd>-
+</span><span class=gd>-  return cursor;
+</span><span class=gd>-}
+</span></code></pre></div><p>We&rsquo;ll replace it with a method that searches the tree for a given key.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+/*
+</span><span class=gi>+Return the position of the given key.
+</span><span class=gi>+If the key is not present, return the position
+</span><span class=gi>+where it should be inserted
+</span><span class=gi>+*/
+</span><span class=gi>+Cursor* table_find(Table* table, uint32_t key) {
+</span><span class=gi>+  uint32_t root_page_num = table-&gt;root_page_num;
+</span><span class=gi>+  void* root_node = get_page(table-&gt;pager, root_page_num);
+</span><span class=gi>+
+</span><span class=gi>+  if (get_node_type(root_node) == NODE_LEAF) {
+</span><span class=gi>+    return leaf_node_find(table, root_page_num, key);
+</span><span class=gi>+  } else {
+</span><span class=gi>+    printf(&#34;Need to implement searching an internal node\n&#34;);
+</span><span class=gi>+    exit(EXIT_FAILURE);
+</span><span class=gi>+  }
+</span><span class=gi>+}
+</span></code></pre></div><p>I&rsquo;m stubbing out the branch for internal nodes because we haven&rsquo;t implemented internal nodes yet. We can search the leaf node with binary search.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key) {
+</span><span class=gi>+  void* node = get_page(table-&gt;pager, page_num);
+</span><span class=gi>+  uint32_t num_cells = *leaf_node_num_cells(node);
+</span><span class=gi>+
+</span><span class=gi>+  Cursor* cursor = malloc(sizeof(Cursor));
+</span><span class=gi>+  cursor-&gt;table = table;
+</span><span class=gi>+  cursor-&gt;page_num = page_num;
+</span><span class=gi>+
+</span><span class=gi>+  // Binary search
+</span><span class=gi>+  uint32_t min_index = 0;
+</span><span class=gi>+  uint32_t one_past_max_index = num_cells;
+</span><span class=gi>+  while (one_past_max_index != min_index) {
+</span><span class=gi>+    uint32_t index = (min_index + one_past_max_index) / 2;
+</span><span class=gi>+    uint32_t key_at_index = *leaf_node_key(node, index);
+</span><span class=gi>+    if (key == key_at_index) {
+</span><span class=gi>+      cursor-&gt;cell_num = index;
+</span><span class=gi>+      return cursor;
+</span><span class=gi>+    }
+</span><span class=gi>+    if (key &lt; key_at_index) {
+</span><span class=gi>+      one_past_max_index = index;
+</span><span class=gi>+    } else {
+</span><span class=gi>+      min_index = index + 1;
+</span><span class=gi>+    }
+</span><span class=gi>+  }
+</span><span class=gi>+
+</span><span class=gi>+  cursor-&gt;cell_num = min_index;
+</span><span class=gi>+  return cursor;
+</span><span class=gi>+}
+</span></code></pre></div><p>This will either return
+- the position of the key,
+- the position of another key that we&rsquo;ll need to move if we want to insert the new key, or
+- the position one past the last key</p><p>Since we&rsquo;re now checking node type, we need functions to get and set that value in a node.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+NodeType get_node_type(void* node) {
+</span><span class=gi>+  uint8_t value = *((uint8_t*)(node + NODE_TYPE_OFFSET));
+</span><span class=gi>+  return (NodeType)value;
+</span><span class=gi>+}
+</span><span class=gi>+
+</span><span class=gi>+void set_node_type(void* node, NodeType type) {
+</span><span class=gi>+  uint8_t value = type;
+</span><span class=gi>+  *((uint8_t*)(node + NODE_TYPE_OFFSET)) = value;
+</span><span class=gi>+}
+</span></code></pre></div><p>We have to cast to <code>uint8_t</code> first to ensure it&rsquo;s serialized as a single byte.</p><p>We also need to initialize node type.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-void initialize_leaf_node(void* node) { *leaf_node_num_cells(node) = 0; }
+</span><span class=gd></span><span class=gi>+void initialize_leaf_node(void* node) {
+</span><span class=gi>+  set_node_type(node, NODE_LEAF);
+</span><span class=gi>+  *leaf_node_num_cells(node) = 0;
+</span><span class=gi>+}
+</span></code></pre></div><p>Lastly, we need to make and handle a new error code.</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gd>-enum ExecuteResult_t { EXECUTE_SUCCESS, EXECUTE_TABLE_FULL };
+</span><span class=gd></span><span class=gi>+enum ExecuteResult_t {
+</span><span class=gi>+  EXECUTE_SUCCESS,
+</span><span class=gi>+  EXECUTE_DUPLICATE_KEY,
+</span><span class=gi>+  EXECUTE_TABLE_FULL
+</span><span class=gi>+};
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>       case (EXECUTE_SUCCESS):
+         printf(&#34;Executed.\n&#34;);
+         break;
+<span class=gi>+      case (EXECUTE_DUPLICATE_KEY):
+</span><span class=gi>+        printf(&#34;Error: Duplicate key.\n&#34;);
+</span><span class=gi>+        break;
+</span><span class=gi></span>       case (EXECUTE_TABLE_FULL):
+         printf(&#34;Error: Table full.\n&#34;);
+         break;
+</code></pre></div><p>With these changes, our test can change to check for sorted order:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff>       &#34;db &gt; Executed.&#34;,
+       &#34;db &gt; Tree:&#34;,
+       &#34;leaf (size 3)&#34;,
+<span class=gd>-      &#34;  - 0 : 3&#34;,
+</span><span class=gd>-      &#34;  - 1 : 1&#34;,
+</span><span class=gd>-      &#34;  - 2 : 2&#34;,
+</span><span class=gd></span><span class=gi>+      &#34;  - 0 : 1&#34;,
+</span><span class=gi>+      &#34;  - 1 : 2&#34;,
+</span><span class=gi>+      &#34;  - 2 : 3&#34;,
+</span><span class=gi></span>       &#34;db &gt; &#34;
+     ])
+   end
+</code></pre></div><p>And we can add a new test for duplicate keys:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gi>+  it &#39;prints an error message if there is a duplicate id&#39; do
+</span><span class=gi>+    script = [
+</span><span class=gi>+      &#34;insert 1 user1 person1@example.com&#34;,
+</span><span class=gi>+      &#34;insert 1 user1 person1@example.com&#34;,
+</span><span class=gi>+      &#34;select&#34;,
+</span><span class=gi>+      &#34;.exit&#34;,
+</span><span class=gi>+    ]
+</span><span class=gi>+    result = run_script(script)
+</span><span class=gi>+    expect(result).to match_array([
+</span><span class=gi>+      &#34;db &gt; Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; Error: Duplicate key.&#34;,
+</span><span class=gi>+      &#34;db &gt; (1, user1, person1@example.com)&#34;,
+</span><span class=gi>+      &#34;Executed.&#34;,
+</span><span class=gi>+      &#34;db &gt; &#34;,
+</span><span class=gi>+    ])
+</span><span class=gi>+  end
+</span></code></pre></div><p>That&rsquo;s it! Next up: implement splitting leaf nodes and creating internal nodes.</p><div class=edit-meta><br><a href=https://github.com/thingsym/hugo-theme-techdoc/edit/master/content/using_c/part9.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=stanzheng.com/build-a-db/using_c/part8/ title="Part 8 - B-Tree Leaf Node Format"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 8 - B-Tree Leaf Node Format</a>
+<a class="nav nav-next" href=stanzheng.com/build-a-db/using_c/part10/ title="Part 10 - Splitting a Leaf Node">Next - Part 10 - Splitting a Leaf Node <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=stanzheng.com/build-a-db>Home</a></li><li class=parent><a href=stanzheng.com/build-a-db/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=stanzheng.com/build-a-db/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=stanzheng.com/build-a-db/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=stanzheng.com/build-a-db/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=stanzheng.com/build-a-db/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=stanzheng.com/build-a-db/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=stanzheng.com/build-a-db/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=stanzheng.com/build-a-db/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li class=active><a href=stanzheng.com/build-a-db/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=stanzheng.com/build-a-db/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=stanzheng.com/build-a-db/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=stanzheng.com/build-a-db/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
