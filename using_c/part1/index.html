@@ -116,19 +116,30 @@ db &gt; .exit
 </span><span class=lnt>54
 </span><span class=lnt>55
 </span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
 </span></code></pre></td><td class=lntd><pre class=chroma><code class=language-c data-lang=c><span class=cp>#include</span> <span class=cpf>&lt;stdbool.h&gt;</span><span class=cp>
 </span><span class=cp>#include</span> <span class=cpf>&lt;stdio.h&gt;</span><span class=cp>
 </span><span class=cp>#include</span> <span class=cpf>&lt;stdlib.h&gt;</span><span class=cp>
 </span><span class=cp>#include</span> <span class=cpf>&lt;string.h&gt;</span><span class=cp>
 </span><span class=cp></span>
-<span class=k>typedef</span> <span class=k>struct</span> <span class=p>{</span>
-  <span class=kt>char</span><span class=o>*</span> <span class=n>buffer</span><span class=p>;</span>
+<span class=k>typedef</span> <span class=k>struct</span>
+<span class=p>{</span>
+  <span class=kt>char</span> <span class=o>*</span><span class=n>buffer</span><span class=p>;</span>
   <span class=n>size_t</span> <span class=n>buffer_length</span><span class=p>;</span>
   <span class=n>ssize_t</span> <span class=n>input_length</span><span class=p>;</span>
 <span class=p>}</span> <span class=n>InputBuffer</span><span class=p>;</span>
 
-<span class=n>InputBuffer</span><span class=o>*</span> <span class=nf>new_input_buffer</span><span class=p>()</span> <span class=p>{</span>
-  <span class=n>InputBuffer</span><span class=o>*</span> <span class=n>input_buffer</span> <span class=o>=</span> <span class=n>malloc</span><span class=p>(</span><span class=k>sizeof</span><span class=p>(</span><span class=n>InputBuffer</span><span class=p>));</span>
+<span class=n>InputBuffer</span> <span class=o>*</span><span class=nf>new_input_buffer</span><span class=p>()</span>
+<span class=p>{</span>
+  <span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span> <span class=o>=</span> <span class=n>malloc</span><span class=p>(</span><span class=k>sizeof</span><span class=p>(</span><span class=n>InputBuffer</span><span class=p>));</span>
   <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span> <span class=o>=</span> <span class=nb>NULL</span><span class=p>;</span>
   <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer_length</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
   <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>input_length</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
@@ -138,11 +149,13 @@ db &gt; .exit
 
 <span class=kt>void</span> <span class=nf>print_prompt</span><span class=p>()</span> <span class=p>{</span> <span class=n>printf</span><span class=p>(</span><span class=s>&#34;db &gt; &#34;</span><span class=p>);</span> <span class=p>}</span>
 
-<span class=kt>void</span> <span class=nf>read_input</span><span class=p>(</span><span class=n>InputBuffer</span><span class=o>*</span> <span class=n>input_buffer</span><span class=p>)</span> <span class=p>{</span>
+<span class=kt>void</span> <span class=nf>read_input</span><span class=p>(</span><span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span><span class=p>)</span>
+<span class=p>{</span>
   <span class=n>ssize_t</span> <span class=n>bytes_read</span> <span class=o>=</span>
       <span class=n>getline</span><span class=p>(</span><span class=o>&amp;</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>),</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer_length</span><span class=p>),</span> <span class=n>stdin</span><span class=p>);</span>
 
-  <span class=k>if</span> <span class=p>(</span><span class=n>bytes_read</span> <span class=o>&lt;=</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>bytes_read</span> <span class=o>&lt;=</span> <span class=mi>0</span><span class=p>)</span>
+  <span class=p>{</span>
     <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Error reading input</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
     <span class=n>exit</span><span class=p>(</span><span class=n>EXIT_FAILURE</span><span class=p>);</span>
   <span class=p>}</span>
@@ -152,25 +165,30 @@ db &gt; .exit
   <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>[</span><span class=n>bytes_read</span> <span class=o>-</span> <span class=mi>1</span><span class=p>]</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
 <span class=p>}</span>
 
-<span class=kt>void</span> <span class=nf>close_input_buffer</span><span class=p>(</span><span class=n>InputBuffer</span><span class=o>*</span> <span class=n>input_buffer</span><span class=p>)</span> <span class=p>{</span>
-    <span class=n>free</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>);</span>
-    <span class=n>free</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
+<span class=kt>void</span> <span class=nf>close_input_buffer</span><span class=p>(</span><span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>free</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>);</span>
+  <span class=n>free</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
 <span class=p>}</span>
 
-<span class=kt>int</span> <span class=nf>main</span><span class=p>(</span><span class=kt>int</span> <span class=n>argc</span><span class=p>,</span> <span class=kt>char</span><span class=o>*</span> <span class=n>argv</span><span class=p>[])</span> <span class=p>{</span>
-  <span class=n>InputBuffer</span><span class=o>*</span> <span class=n>input_buffer</span> <span class=o>=</span> <span class=n>new_input_buffer</span><span class=p>();</span>
-  <span class=k>while</span> <span class=p>(</span><span class=nb>true</span><span class=p>)</span> <span class=p>{</span>
+<span class=kt>int</span> <span class=nf>main</span><span class=p>(</span><span class=kt>int</span> <span class=n>argc</span><span class=p>,</span> <span class=kt>char</span> <span class=o>*</span><span class=n>argv</span><span class=p>[])</span>
+<span class=p>{</span>
+  <span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span> <span class=o>=</span> <span class=n>new_input_buffer</span><span class=p>();</span>
+  <span class=k>while</span> <span class=p>(</span><span class=nb>true</span><span class=p>)</span>
+  <span class=p>{</span>
     <span class=n>print_prompt</span><span class=p>();</span>
     <span class=n>read_input</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
 
-    <span class=k>if</span> <span class=p>(</span><span class=n>strcmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;.exit&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+    <span class=k>if</span> <span class=p>(</span><span class=n>strcmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;.exit&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+    <span class=p>{</span>
       <span class=n>close_input_buffer</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
       <span class=n>exit</span><span class=p>(</span><span class=n>EXIT_SUCCESS</span><span class=p>);</span>
-    <span class=p>}</span> <span class=k>else</span> <span class=p>{</span>
+    <span class=p>}</span>
+    <span class=k>else</span>
+    <span class=p>{</span>
       <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Unrecognized command &#39;%s&#39;.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>,</span> <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>);</span>
     <span class=p>}</span>
   <span class=p>}</span>
 <span class=p>}</span>
-
 </code></pre></td></tr></table></div></div></figure><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_c/part1.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_c/ title="How Does a Database Work? In [C]"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - How Does a Database Work? In [C]</a>
 <a class="nav nav-next" href=/using_c/part2/ title="Part 2 - World's Simplest SQL Compiler and Virtual Machine">Next - Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=https://build-a-db.stanzheng.com/>Home</a></li><li class=parent><a href=/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li class=active><a href=/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li><li><a href=/using_python/>How Does a Database Work? In [Python]</a><ul class=sub-menu><li><a href=/using_python/part1/>Part 1 - Introduction and Setting up the REPL</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
