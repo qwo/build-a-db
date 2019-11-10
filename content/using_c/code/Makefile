@@ -1,4 +1,4 @@
-all : clean db run
+all : clean db 
 .PHONY : all
 
 db:  

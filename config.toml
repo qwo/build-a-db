@@ -1,4 +1,4 @@
-baseURL = "http://build-a-db.stanzheng.com/"
+baseURL = "https://build-a-db.stanzheng.com/"
 
 languageCode = "en-us"
 DefaultContentLanguage = "en"

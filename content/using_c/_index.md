@@ -3,7 +3,7 @@ title: How Does a Database Work? In [C]
 weight: 20
 ---
 
--- *Based on the material from [CStack's write a SQlit3 clone scratch](https://cstack.github.io/db_tutorial/)
+-- *Based on the material from [CStack's write a SQlite clone scratch](https://cstack.github.io/db_tutorial/)
 
 Makefile in `content/code/Makefile`
 
