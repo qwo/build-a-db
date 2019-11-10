@@ -3,6 +3,8 @@ title: How Does a Database Work? In [C]
 weight: 20
 ---
 
+-- *Based on the material from [CStack's write a SQlit3 clone scratch](https://cstack.github.io/db_tutorial/) f
+
 - What format is data saved in? (in memory and on disk)
 - When does it move from memory to disk?
 - Why can there only be one primary key per table?
