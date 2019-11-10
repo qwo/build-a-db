@@ -8,15 +8,14 @@ def print_prompt():
 
 
 def main(line=None):
-  while True:
-    print_prompt()
-    user_input = line or input()
-    if user_input == ".exit":
-      break
+    while True:
+        print_prompt()
+        user_input = line or input()
+        if user_input == ".exit":
+            break
 
-    else:
-      print("Unrecognized command '{}'.\n".format(user_input))
-
+        else:
+            print("Unrecognized command '{}'.\n".format(user_input))
 
 
 if __name__ == "__main__":

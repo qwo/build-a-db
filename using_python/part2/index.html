@@ -17,152 +17,165 @@ This is  where we would do an insert.
 Executed.
 
 $ .exit
-</code></pre><figure class=code><figcaption><h2>part2.py</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=lnt> 1
-</span><span class=lnt> 2
-</span><span class=lnt> 3
-</span><span class=lnt> 4
-</span><span class=lnt> 5
-</span><span class=lnt> 6
-</span><span class=lnt> 7
-</span><span class=lnt> 8
-</span><span class=lnt> 9
-</span><span class=lnt>10
-</span><span class=lnt>11
-</span><span class=lnt>12
-</span><span class=lnt>13
-</span><span class=lnt>14
-</span><span class=lnt>15
-</span><span class=lnt>16
-</span><span class=lnt>17
-</span><span class=lnt>18
-</span><span class=lnt>19
-</span><span class=lnt>20
-</span><span class=lnt>21
-</span><span class=lnt>22
-</span><span class=lnt>23
-</span><span class=lnt>24
-</span><span class=lnt>25
-</span><span class=lnt>26
-</span><span class=lnt>27
-</span><span class=lnt>28
-</span><span class=lnt>29
-</span><span class=lnt>30
-</span><span class=lnt>31
-</span><span class=lnt>32
-</span><span class=lnt>33
-</span><span class=lnt>34
-</span><span class=lnt>35
-</span><span class=lnt>36
-</span><span class=lnt>37
-</span><span class=lnt>38
-</span><span class=lnt>39
-</span><span class=lnt>40
-</span><span class=lnt>41
-</span><span class=lnt>42
-</span><span class=lnt>43
-</span><span class=lnt>44
-</span><span class=lnt>45
-</span><span class=lnt>46
-</span><span class=lnt>47
-</span><span class=lnt>48
-</span><span class=lnt>49
-</span><span class=lnt>50
-</span><span class=lnt>51
-</span><span class=lnt>52
-</span><span class=lnt>53
-</span><span class=lnt>54
-</span><span class=lnt>55
-</span><span class=lnt>56
-</span><span class=lnt>57
-</span><span class=lnt>58
-</span><span class=lnt>59
-</span><span class=lnt>60
-</span><span class=lnt>61
-</span><span class=lnt>62
-</span><span class=lnt>63
-</span><span class=lnt>64
-</span><span class=lnt>65
-</span><span class=lnt>66
-</span><span class=lnt>67
-</span><span class=lnt>68
-</span><span class=lnt>69
-</span><span class=lnt>70
-</span><span class=lnt>71
-</span><span class=lnt>72
-</span><span class=lnt>73
-</span><span class=lnt>74
-</span><span class=lnt>75
-</span><span class=lnt>76
-</span><span class=lnt>77
-</span><span class=lnt>78
-</span><span class=lnt>79
-</span><span class=lnt>80
-</span><span class=lnt>81
-</span><span class=lnt>82
-</span><span class=lnt>83
-</span><span class=lnt>84
-</span><span class=lnt>85
-</span><span class=lnt>86
-</span><span class=lnt>87
-</span><span class=lnt>88
-</span><span class=lnt>89
-</span><span class=lnt>90
-</span><span class=lnt>91
-</span><span class=lnt>92
-</span><span class=lnt>93
-</span><span class=lnt>94
+</code></pre><figure class=code><figcaption><h2>part2.py</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=lnt>  1
+</span><span class=lnt>  2
+</span><span class=lnt>  3
+</span><span class=lnt>  4
+</span><span class=lnt>  5
+</span><span class=lnt>  6
+</span><span class=lnt>  7
+</span><span class=lnt>  8
+</span><span class=lnt>  9
+</span><span class=lnt> 10
+</span><span class=lnt> 11
+</span><span class=lnt> 12
+</span><span class=lnt> 13
+</span><span class=lnt> 14
+</span><span class=lnt> 15
+</span><span class=lnt> 16
+</span><span class=lnt> 17
+</span><span class=lnt> 18
+</span><span class=lnt> 19
+</span><span class=lnt> 20
+</span><span class=lnt> 21
+</span><span class=lnt> 22
+</span><span class=lnt> 23
+</span><span class=lnt> 24
+</span><span class=lnt> 25
+</span><span class=lnt> 26
+</span><span class=lnt> 27
+</span><span class=lnt> 28
+</span><span class=lnt> 29
+</span><span class=lnt> 30
+</span><span class=lnt> 31
+</span><span class=lnt> 32
+</span><span class=lnt> 33
+</span><span class=lnt> 34
+</span><span class=lnt> 35
+</span><span class=lnt> 36
+</span><span class=lnt> 37
+</span><span class=lnt> 38
+</span><span class=lnt> 39
+</span><span class=lnt> 40
+</span><span class=lnt> 41
+</span><span class=lnt> 42
+</span><span class=lnt> 43
+</span><span class=lnt> 44
+</span><span class=lnt> 45
+</span><span class=lnt> 46
+</span><span class=lnt> 47
+</span><span class=lnt> 48
+</span><span class=lnt> 49
+</span><span class=lnt> 50
+</span><span class=lnt> 51
+</span><span class=lnt> 52
+</span><span class=lnt> 53
+</span><span class=lnt> 54
+</span><span class=lnt> 55
+</span><span class=lnt> 56
+</span><span class=lnt> 57
+</span><span class=lnt> 58
+</span><span class=lnt> 59
+</span><span class=lnt> 60
+</span><span class=lnt> 61
+</span><span class=lnt> 62
+</span><span class=lnt> 63
+</span><span class=lnt> 64
+</span><span class=lnt> 65
+</span><span class=lnt> 66
+</span><span class=lnt> 67
+</span><span class=lnt> 68
+</span><span class=lnt> 69
+</span><span class=lnt> 70
+</span><span class=lnt> 71
+</span><span class=lnt> 72
+</span><span class=lnt> 73
+</span><span class=lnt> 74
+</span><span class=lnt> 75
+</span><span class=lnt> 76
+</span><span class=lnt> 77
+</span><span class=lnt> 78
+</span><span class=lnt> 79
+</span><span class=lnt> 80
+</span><span class=lnt> 81
+</span><span class=lnt> 82
+</span><span class=lnt> 83
+</span><span class=lnt> 84
+</span><span class=lnt> 85
+</span><span class=lnt> 86
+</span><span class=lnt> 87
+</span><span class=lnt> 88
+</span><span class=lnt> 89
+</span><span class=lnt> 90
+</span><span class=lnt> 91
+</span><span class=lnt> 92
+</span><span class=lnt> 93
+</span><span class=lnt> 94
+</span><span class=lnt> 95
+</span><span class=lnt> 96
+</span><span class=lnt> 97
+</span><span class=lnt> 98
+</span><span class=lnt> 99
+</span><span class=lnt>100
 </span></code></pre></td><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=ch>#!/usr/bin/python3</span>
 
 <span class=kn>import</span> <span class=nn>sys</span>
 
 <span class=kn>from</span> <span class=nn>enum</span> <span class=kn>import</span> <span class=n>Enum</span>
 
-<span class=k>class</span> <span class=nc>MetaCommandResult</span> <span class=p>(</span><span class=n>Enum</span><span class=p>):</span>
-  <span class=n>META_COMMAND_SUCCESS</span> <span class=o>=</span> <span class=s2>&#34;META_COMMAND_SUCCESS&#34;</span>
-  <span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span> <span class=o>=</span> <span class=s2>&#34;META_COMMAND_UNRECOGNIZED_COMMAND&#34;</span>
 
-<span class=k>class</span> <span class=nc>PrepareResult</span> <span class=p>(</span><span class=n>Enum</span><span class=p>):</span>
-  <span class=n>PREPARE_SUCCESS</span> <span class=o>=</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span>
-  <span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span> <span class=o>=</span> <span class=s2>&#34;PREPARE_UNRECOGNIZED_STATEMENT&#34;</span>
-  
-<span class=k>class</span> <span class=nc>Statement</span> <span class=p>(</span><span class=n>Enum</span><span class=p>):</span><span class=k>pass</span>
-<span class=k>class</span> <span class=nc>StatementType</span> <span class=p>(</span><span class=n>Statement</span><span class=p>):</span>
-  <span class=n>STATEMENT_INSERT</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_INSERT&#34;</span>
-  <span class=n>STATEMENT_SELECT</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_SELECT&#34;</span>
-  
+<span class=k>class</span> <span class=nc>MetaCommandResult</span><span class=p>(</span><span class=n>Enum</span><span class=p>):</span>
+    <span class=n>META_COMMAND_SUCCESS</span> <span class=o>=</span> <span class=s2>&#34;META_COMMAND_SUCCESS&#34;</span>
+    <span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span> <span class=o>=</span> <span class=s2>&#34;META_COMMAND_UNRECOGNIZED_COMMAND&#34;</span>
+
+
+<span class=k>class</span> <span class=nc>PrepareResult</span><span class=p>(</span><span class=n>Enum</span><span class=p>):</span>
+    <span class=n>PREPARE_SUCCESS</span> <span class=o>=</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span>
+    <span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span> <span class=o>=</span> <span class=s2>&#34;PREPARE_UNRECOGNIZED_STATEMENT&#34;</span>
+
+
+<span class=k>class</span> <span class=nc>Statement</span><span class=p>(</span><span class=n>Enum</span><span class=p>):</span>
+    <span class=k>pass</span>
+
+
+<span class=k>class</span> <span class=nc>StatementType</span><span class=p>(</span><span class=n>Statement</span><span class=p>):</span>
+    <span class=n>STATEMENT_INSERT</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_INSERT&#34;</span>
+    <span class=n>STATEMENT_SELECT</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_SELECT&#34;</span>
+
 
 <span class=k>def</span> <span class=nf>do_meta_command</span><span class=p>(</span><span class=n>line</span><span class=p>):</span>
-  <span class=s2>&#34;&#34;&#34;
+    <span class=s2>&#34;&#34;&#34;
 </span><span class=s2>  @returns 0 or {MetaCommandResult}
 </span><span class=s2>  &#34;&#34;&#34;</span>
-  <span class=k>if</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;.exit&#34;</span><span class=p>:</span>
-    <span class=k>return</span> <span class=mi>0</span>
-  <span class=k>else</span><span class=p>:</span>
-    <span class=k>return</span> <span class=n>MetaCommandResult</span><span class=o>.</span><span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span>
+    <span class=k>if</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;.exit&#34;</span><span class=p>:</span>
+        <span class=k>return</span> <span class=mi>0</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=k>return</span> <span class=n>MetaCommandResult</span><span class=o>.</span><span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span>
+
 
 <span class=k>def</span> <span class=nf>prepare_statement</span><span class=p>(</span><span class=n>line</span><span class=p>):</span>
-  <span class=s2>&#34;&#34;&#34;
+    <span class=s2>&#34;&#34;&#34;
 </span><span class=s2>  @returns ( {PrepareResult}, {STATEMENT_TYPE} )
 </span><span class=s2>  &#34;&#34;&#34;</span>
-  <span class=k>if</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;insert&#34;</span><span class=p>:</span>
-    <span class=n>STATEMENT_TYPE</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_INSERT&#34;</span>
-    <span class=k>return</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
-  <span class=k>elif</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;select&#34;</span><span class=p>:</span>
-    <span class=n>STATEMENT_TYPE</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_SELECT&#34;</span>
-    <span class=k>return</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
-  <span class=k>else</span><span class=p>:</span>
-    <span class=k>return</span> <span class=s2>&#34;PREPARE_UNRECOGNIZED_STATEMENT&#34;</span><span class=p>,</span> <span class=bp>None</span>
+    <span class=k>if</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;insert&#34;</span><span class=p>:</span>
+        <span class=n>STATEMENT_TYPE</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_INSERT&#34;</span>
+        <span class=k>return</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
+    <span class=k>elif</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;select&#34;</span><span class=p>:</span>
+        <span class=n>STATEMENT_TYPE</span> <span class=o>=</span> <span class=s2>&#34;STATEMENT_SELECT&#34;</span>
+        <span class=k>return</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=k>return</span> <span class=s2>&#34;PREPARE_UNRECOGNIZED_STATEMENT&#34;</span><span class=p>,</span> <span class=bp>None</span>
 
 
 <span class=k>def</span> <span class=nf>execute_statement</span><span class=p>(</span><span class=n>line</span><span class=p>):</span>
-  <span class=s2>&#34;&#34;&#34;
+    <span class=s2>&#34;&#34;&#34;
 </span><span class=s2>  @returns {PrepareResult} 
 </span><span class=s2>  or PREPARE_UNRECOGNIZED_STATEMENT
 </span><span class=s2>  &#34;&#34;&#34;</span>
-  <span class=k>if</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;STATEMENT_INSERT&#34;</span><span class=p>:</span>
-    <span class=k>print</span><span class=p>(</span><span class=s2>&#34;This is  where we would do an insert.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>    
-  <span class=k>elif</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;STATEMENT_SELECT&#34;</span><span class=p>:</span>
-    <span class=k>print</span><span class=p>(</span><span class=s2>&#34;This is where we would do a select.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;STATEMENT_INSERT&#34;</span><span class=p>:</span>
+        <span class=k>print</span><span class=p>(</span><span class=s2>&#34;This is  where we would do an insert.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
+    <span class=k>elif</span> <span class=n>line</span> <span class=o>==</span> <span class=s2>&#34;STATEMENT_SELECT&#34;</span><span class=p>:</span>
+        <span class=k>print</span><span class=p>(</span><span class=s2>&#34;This is where we would do a select.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
 
 
 <span class=k>def</span> <span class=nf>print_prompt</span><span class=p>():</span>
@@ -170,33 +183,32 @@ $ .exit
 
 
 <span class=k>def</span> <span class=nf>main</span><span class=p>(</span><span class=n>line</span><span class=o>=</span><span class=bp>None</span><span class=p>):</span>
-  <span class=k>while</span> <span class=bp>True</span><span class=p>:</span>
-    <span class=n>print_prompt</span><span class=p>()</span>
-    <span class=n>user_input</span> <span class=o>=</span> <span class=n>line</span> <span class=ow>or</span> <span class=nb>input</span><span class=p>()</span>
-    <span class=k>if</span> <span class=n>user_input</span> <span class=o>==</span> <span class=s2>&#34;.exit&#34;</span><span class=p>:</span>
-      <span class=k>break</span>
+    <span class=k>while</span> <span class=bp>True</span><span class=p>:</span>
+        <span class=n>print_prompt</span><span class=p>()</span>
+        <span class=n>user_input</span> <span class=o>=</span> <span class=n>line</span> <span class=ow>or</span> <span class=nb>input</span><span class=p>()</span>
+        <span class=k>if</span> <span class=n>user_input</span> <span class=o>==</span> <span class=s2>&#34;.exit&#34;</span><span class=p>:</span>
+            <span class=k>break</span>
 
-    <span class=c1>## MetaCommand</span>
-    <span class=k>if</span> <span class=n>user_input</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=o>==</span> <span class=s1>&#39;.&#39;</span><span class=p>:</span>
-      <span class=n>meta_command</span> <span class=o>=</span> <span class=n>do_meta_command</span><span class=p>(</span><span class=n>user_input</span><span class=p>)</span>
-      <span class=c1># DETECT_TYPE META_COMMAND_SUCCESS ENUM AND PICK COMMAND</span>
-      <span class=k>if</span> <span class=n>meta_command</span> <span class=o>==</span> <span class=s2>&#34;META_COMMAND_SUCCESS&#34;</span><span class=p>:</span>
-         <span class=k>pass</span>
-      <span class=k>elif</span> <span class=n>meta_command</span> <span class=o>==</span> <span class=n>MetaCommandResult</span><span class=o>.</span><span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span><span class=p>:</span>
-        <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized command &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
-      <span class=k>continue</span> <span class=c1># EXIT META COMMAND</span>
+        <span class=c1>## MetaCommand</span>
+        <span class=k>if</span> <span class=n>user_input</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=o>==</span> <span class=s2>&#34;.&#34;</span><span class=p>:</span>
+            <span class=n>meta_command</span> <span class=o>=</span> <span class=n>do_meta_command</span><span class=p>(</span><span class=n>user_input</span><span class=p>)</span>
+            <span class=c1># DETECT_TYPE META_COMMAND_SUCCESS ENUM AND PICK COMMAND</span>
+            <span class=k>if</span> <span class=n>meta_command</span> <span class=o>==</span> <span class=s2>&#34;META_COMMAND_SUCCESS&#34;</span><span class=p>:</span>
+                <span class=k>pass</span>
+            <span class=k>elif</span> <span class=n>meta_command</span> <span class=o>==</span> <span class=n>MetaCommandResult</span><span class=o>.</span><span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span><span class=p>:</span>
+                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized command &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
+            <span class=k>continue</span>  <span class=c1># EXIT META COMMAND</span>
 
-    <span class=c1>## Statement</span>
-    <span class=n>prepare_status</span><span class=p>,</span> <span class=n>statement</span> <span class=o>=</span> <span class=n>prepare_statement</span><span class=p>(</span><span class=n>user_input</span><span class=p>)</span>
-    
-    <span class=c1># STATEMENT DETECT_TYPE PREPARE_SUCCESS ENUM AND PICK STATEMENT</span>
-    <span class=k>if</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SUCCESS</span><span class=p>:</span>
-      <span class=k>continue</span>
-    <span class=k>elif</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>:</span>
-      <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized keyword at start of &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
-    <span class=n>execute_statement</span><span class=p>(</span><span class=n>statement</span><span class=p>)</span>
-    <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Executed.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
+        <span class=c1>## Statement</span>
+        <span class=n>prepare_status</span><span class=p>,</span> <span class=n>statement</span> <span class=o>=</span> <span class=n>prepare_statement</span><span class=p>(</span><span class=n>user_input</span><span class=p>)</span>
 
+        <span class=c1># STATEMENT DETECT_TYPE PREPARE_SUCCESS ENUM AND PICK STATEMENT</span>
+        <span class=k>if</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SUCCESS</span><span class=p>:</span>
+            <span class=k>continue</span>
+        <span class=k>elif</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>:</span>
+            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized keyword at start of &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
+        <span class=n>execute_statement</span><span class=p>(</span><span class=n>statement</span><span class=p>)</span>
+        <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Executed.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
 
 
 <span class=k>if</span> <span class=vm>__name__</span> <span class=o>==</span> <span class=s2>&#34;__main__&#34;</span><span class=p>:</span>
@@ -204,5 +216,6 @@ $ .exit
         <span class=n>main</span><span class=p>()</span>
     <span class=k>else</span><span class=p>:</span>
         <span class=k>for</span> <span class=n>line</span> <span class=ow>in</span> <span class=n>sys</span><span class=o>.</span><span class=n>stdin</span><span class=p>:</span>
-            <span class=n>main</span><span class=p>(</span><span class=n>line</span><span class=p>)</span></code></pre></td></tr></table></div></div></figure><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_python/part2.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_python/part1/ title="Part 1 - Introduction and Setting up the REPL"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 1 - Introduction and Setting up the REPL</a>
+            <span class=n>main</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
+</code></pre></td></tr></table></div></div></figure><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_python/part2.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_python/part1/ title="Part 1 - Introduction and Setting up the REPL"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 1 - Introduction and Setting up the REPL</a>
 <a class="nav nav-next" href=/using_python/part1/ title="Part 1 - Introduction and Setting up the REPL">Next - Part 1 - Introduction and Setting up the REPL <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=https://build-a-db.stanzheng.com/>Home</a></li><li><a href=/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li><li class=parent><a href=/using_python/>How Does a Database Work? In [Python]</a><ul class=sub-menu><li><a href=/using_python/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li class=active><a href=/using_python/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
