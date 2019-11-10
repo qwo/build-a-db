@@ -1,8 +1,8 @@
-baseURL = "https://example.com"
+baseURL = "stanzheng.com/build-a-db"
 
 languageCode = "en-us"
 DefaultContentLanguage = "en"
-title = "Hugo Techdoc Theme"
+title = "Build a database in X"
 theme = "hugo-theme-techdoc"
 
 hasCJKLanguage = true
@@ -19,7 +19,7 @@ enableMissingTranslationPlaceholders = false
 
     # Souce Code repository section
     description = "put your description"
-    github_repository = "https://github.com/thingsym/hugo-theme-techdoc"
+    github_repository = "https://github.com/stanzheng/build_a_database"
     version = "0.4.0"
 
     # Documentation repository section
