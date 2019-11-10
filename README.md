@@ -191,47 +191,12 @@ Small patches and bug reports can be submitted a issue tracker in Github. Forkin
 
 ## Changelog
 
-* Version 0.4.0 - 2019.11.02
-	* update Sample Document
-	* add Theme color
-	* add Menu style
-	* improve scss
-* Version 0.3.0 - 2019.10.06
-  * fix archetypes
-  * add prepend-body.html for Tag Manager noscript version
-  * change class name from menu to global-menu
-  * rename partials files
-  * fix javascript path for webpack
-  * improve development environment
-  * move javascript files to src directory
-* Version 0.2.2 - 2019.04.27
-  * fix Lastmod's and PublishDate's initial value of 0001-01-01
-* Version 0.2.1 - 2018.12.07
-  * fix scss lint errors
-  * change lint from scss-lint to stylelint
-  * add published date
-  * change the font color of powered by
-  * fix link on powered by
-* Version 0.2.0 - 2018.11.21
-  * add screenshot images
-  * add exampleSite
-  * fix sub-menu for responsive
-  * improve menu and pagination
-* Version 0.1.0 - 2018.03.04
-  * initial release
-
-## License
-
-Techdoc is licensed under the MIT License.
-
-Techdoc bundles the following third-party resources:
-
-* CSS reset by [normalize.css](https://necolas.github.io/normalize.css/), [MIT](https://opensource.org/licenses/MIT)
-* jQuery Plugin [Back to the Top](https://github.com/thingsym/jquery.backtothetop), [MIT](https://opensource.org/licenses/MIT)
-* Sass Mixin [Flexbox Grid Mixins](https://thingsym.github.io/flexbox-grid-mixins/), [MIT](https://opensource.org/licenses/MIT)
-
-## Author
+Original Theme By
 
 [thingsym](https://github.com/thingsym)
 
 Copyright (c) 2017-2019 by thingsym
+
+
+## Copyright
+MIT 

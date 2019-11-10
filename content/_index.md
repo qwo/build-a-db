@@ -4,16 +4,12 @@ lastmod: 2019-10-26T15:26:15Z
 publishdate: 2018-11-23T15:26:15Z
 ---
 
-# Hugo Techdoc Theme
+# Build a database
 
-## The Techdoc is a Hugo Theme for technical documentation.
+-- *Based on the material from [CStack's write a SQlit3 clone scratch](https://cstack.github.io/db_tutorial/)
 
-## Features
+## Languages
 
-* Modern, Simple layout
-* Responsive web design
-* Documentation menu (Select Menu style)
-* Theme color
-* Edit link to documentation repository
-* Custom Shortcodes
-* Analytics with Google Analytics, Google Tag Manager
+* C 
+* Python (coming soon)
+* Rust (coming Soon)
