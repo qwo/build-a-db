@@ -56,4 +56,3 @@ Copyright (c) 2017-2019 by thingsym
 
 ## Copyright
 MIT 
-/home/stanleyz/Code/recurse/null/build_a_db/gh-pages
