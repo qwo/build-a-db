@@ -3,7 +3,14 @@ title: How Does a Database Work? In [C]
 weight: 20
 ---
 
--- *Based on the material from [CStack's write a SQlit3 clone scratch](https://cstack.github.io/db_tutorial/) f
+-- *Based on the material from [CStack's write a SQlit3 clone scratch](https://cstack.github.io/db_tutorial/)
+
+Makefile in `content/code/Makefile`
+
+
+` make all arg1=content/using_c/code/part1.c ` for example to run part 1
+
+`make all arg1=content/using_c/code/db.c` for finished example
 
 - What format is data saved in? (in memory and on disk)
 - When does it move from memory to disk?
