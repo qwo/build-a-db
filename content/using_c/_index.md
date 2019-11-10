@@ -1,5 +1,5 @@
 ---
-title: How Does a Database Work?
+title: How Does a Database Work? In [C]
 weight: 20
 ---
 
@@ -15,10 +15,7 @@ In short, how does a database **work**?
 
 I'm building a clone of [sqlite](https://www.sqlite.org/arch.html) from scratch in C in order to understand, and I'm going to document my process as I go.
 
-# Table of Contents
-{% for part in site.parts %}- [{{part.title}}]({{site.baseurl}}{{part.url}})
-{% endfor %}
 
 > "What I cannot create, I do not understand." -- [Richard Feynman](https://en.m.wikiquote.org/wiki/Richard_Feynman)
 
-<img src="assets/images/arch2.gif" description="sqlite architecture (https://www.sqlite.org/arch.html)" />
+<img src="/assets/images/arch2.gif" description="sqlite architecture (https://www.sqlite.org/arch.html)" />
