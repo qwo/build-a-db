@@ -66,7 +66,7 @@ def main(line=None):
     ## MetaCommand
     if user_input[0] == '.':
       meta_command = do_meta_command(user_input)
-     # @TODO STATEMENT DETECT_TYPE META_COMMAND_SUCCESS ENUM AND PICK COMMAND
+      # DETECT_TYPE META_COMMAND_SUCCESS ENUM AND PICK COMMAND
       if meta_command == "META_COMMAND_SUCCESS":
          pass
       elif meta_command == MetaCommandResult.META_COMMAND_UNRECOGNIZED_COMMAND:
@@ -76,7 +76,7 @@ def main(line=None):
     ## Statement
     prepare_status, statement = prepare_statement(user_input)
     
-    # @TODO STATEMENT DETECT_TYPE PREPARE_SUCCESS ENUM AND PICK STATEMENT
+    # STATEMENT DETECT_TYPE PREPARE_SUCCESS ENUM AND PICK STATEMENT
     if prepare_status == PrepareResult.PREPARE_SUCCESS:
       continue
     elif prepare_status == PrepareResult.PREPARE_UNRECOGNIZED_STATEMENT:
