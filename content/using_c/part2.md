@@ -7,7 +7,7 @@ We're making a clone of sqlite. The "front-end" of sqlite is a SQL compiler that
 
 This bytecode is passed to the virtual machine, which executes it.
 
-{% include image.html url="assets/images/arch2.gif" description="SQLite Architecture (https://www.sqlite.org/arch.html)" %}
+<img src="/assets/images/arch2.gif" description="SQLite Architecture (https://www.sqlite.org/arch.html)"/>
 
 Breaking things into two steps like this has a couple advantages:
 - Reduces the complexity of each part (e.g. virtual machine does not worry about syntax errors)
