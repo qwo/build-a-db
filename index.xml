@@ -36,6 +36,4 @@ aaa</description></item><item><title>Hello_world</title><link>http://build-a-db.
 vvvv
 aaa</description></item><item><title>Hello_world</title><link>http://build-a-db.stanzheng.com/entry/hello_world/</link><pubDate>Tue, 17 Oct 2017 14:00:45 +0000</pubDate><guid>http://build-a-db.stanzheng.com/entry/hello_world/</guid><description>aaaaaa
 vvvv
-aaa</description></item><item><title>About Hugo</title><link>http://build-a-db.stanzheng.com/about/</link><pubDate>Wed, 09 Apr 2014 00:00:00 +0000</pubDate><guid>http://build-a-db.stanzheng.com/about/</guid><description>Hugo is a static site engine written in Go.
-It makes use of a variety of open source projects including:
-Cobra Viper J Walter Weatherman Cast Learn more and contribute on GitHub.</description></item></channel></rss>
+aaa</description></item></channel></rss>
