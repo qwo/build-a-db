@@ -2,6 +2,12 @@
 
 Build a DB is an upgraded version of cstack's build-a-db in C project. Using the Hugo Theme for technical documentation.
 
+https://cstack.github.io/db_tutorial/
+
+Supported Languages
+- C
+- Python [In-progress]
+- Rust [Back-burner]
 
 ## Features
 
@@ -16,9 +22,6 @@ Ubuntu 18.04+  - ` sudo apt install ruby-rspec-core`
 
 `rspec` 
 
-
-
-## Screenshot
 
 
 ## Deploy Site to public_html directory
