@@ -1,0 +1,60 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 1 - Introduction and Setting up the REPL - Build a database in X</title><meta name=description content="Learn By Building"><meta name=generator content="Hugo 0.58.3"><link href=https://build-a-db.stanzheng.com/index.xml rel=alternate type=application/rss+xml><link rel=canonical href=https://build-a-db.stanzheng.com/using_python/part1/><link rel=stylesheet href=https://build-a-db.stanzheng.com/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=https://build-a-db.stanzheng.com/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=https://build-a-db.stanzheng.com/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 1.0.0</span><p class=description>Learn By Building</p></header><div class=global-menu><nav><ul><li><a href=/>Home</a></li><li><a href=https://github.com/stanzheng/build-a-db>Github</a></li><li><a href=https://twitter.com/stanzheng>Twitter</a></li></ul></nav></div><div class=content-container><main><h1>Part 1 - Introduction and Setting up the REPL</h1><p>Writing a REPL that accepts input</p><p><code>./part1.py</code>
+also accepts CLI <code>python ./part1.py</code></p><pre><code>db &gt; 
+$ foo
+Unrecognized command 'foo'.
+$ .exit
+</code></pre><figure class=code><figcaption><h2>part1.py</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=ch>#!/usr/bin/python3</span>
+
+<span class=kn>import</span> <span class=nn>sys</span>
+
+
+<span class=k>def</span> <span class=nf>print_prompt</span><span class=p>():</span>
+    <span class=k>print</span><span class=p>(</span><span class=s2>&#34;db &gt; &#34;</span><span class=p>)</span>
+
+
+<span class=k>def</span> <span class=nf>main</span><span class=p>(</span><span class=n>line</span><span class=o>=</span><span class=bp>None</span><span class=p>):</span>
+  <span class=k>while</span> <span class=bp>True</span><span class=p>:</span>
+    <span class=n>print_prompt</span><span class=p>()</span>
+    <span class=n>user_input</span> <span class=o>=</span> <span class=n>line</span> <span class=ow>or</span> <span class=nb>input</span><span class=p>()</span>
+    <span class=k>if</span> <span class=n>user_input</span> <span class=o>==</span> <span class=s2>&#34;.exit&#34;</span><span class=p>:</span>
+      <span class=k>break</span>
+
+    <span class=k>else</span><span class=p>:</span>
+      <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized command &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
+
+
+
+<span class=k>if</span> <span class=vm>__name__</span> <span class=o>==</span> <span class=s2>&#34;__main__&#34;</span><span class=p>:</span>
+    <span class=k>if</span> <span class=n>sys</span><span class=o>.</span><span class=n>stdin</span><span class=o>.</span><span class=n>isatty</span><span class=p>():</span>
+        <span class=n>main</span><span class=p>()</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=k>for</span> <span class=n>line</span> <span class=ow>in</span> <span class=n>sys</span><span class=o>.</span><span class=n>stdin</span><span class=p>:</span>
+            <span class=n>main</span><span class=p>(</span><span class=n>line</span><span class=p>)</span></code></pre></td></tr></table></div></div></figure><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_python/part1.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_python/ title="How Does a Database Work? In [Python]"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - How Does a Database Work? In [Python]</a>
+<a class="nav nav-next" href=/using_c/ title="How Does a Database Work? In [C]">Next - How Does a Database Work? In [C] <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=https://build-a-db.stanzheng.com/>Home</a></li><li><a href=/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li><li class=parent><a href=/using_python/>How Does a Database Work? In [Python]</a><ul class=sub-menu><li class=active><a href=/using_python/part1/>Part 1 - Introduction and Setting up the REPL</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
