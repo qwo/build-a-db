@@ -120,8 +120,6 @@ def main(line=None):
         print_prompt()
         user_input = line or input()
         user_input = user_input.strip()
-        # if user_input == ".exit":
-        #     break
 
         ## MetaCommand
         if user_input[0] == ".":
