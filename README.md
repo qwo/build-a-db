@@ -9,6 +9,7 @@ Supported Languages
 - Python [In-progress]
 - Rust [Back-burner]
 
+
 ## Features
 
 * Modern, Simple layout
@@ -22,6 +23,9 @@ Ubuntu 18.04+  - ` sudo apt install ruby-rspec-core`
 
 `rspec` 
 
+## Tools
+Use the below sed command to remove +/- diffs
+`cat FILE1.c | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" > FILE1_clean2.c `
 
 
 ## Deploy Site to public_html directory
