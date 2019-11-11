@@ -3,6 +3,7 @@
 import sys
 
 from dataclasses import dataclass
+from collections import namedtuple
 from enum import Enum
 
 
@@ -35,15 +36,18 @@ CONST_MAX_ROW_PER_PAGE = 4096
 @dataclass
 class Table():
 
-    def __init__(self):
+    def __init__(self, ):
         self.table_name = "default table"
         self.pages = CONST_MAX_PAGES
         self.index = [[]*CONST_MAX_PAGES]
         self.num_rows = 0
+        self.fields = ["id", "name", "email"]
+        self.Row = namedtuple('Row', self.fields)
 
     def insert_row(self, row):
         page = 0
-        self.index[page].append(row)
+        self.index[page].append(        self.serialize_row(row))
+        self.num_rows +=1
         return "inserted 1 in {}".format(self.table_name)
     
     def select(self, line):
@@ -51,6 +55,10 @@ class Table():
         for i in self.index:
             select.extend(i)
         return select
+
+    def serialize_row(self, line):
+        return self.Row._make(line.split(" ")[1:])
+
 
 def do_meta_command(line):
     """
@@ -87,6 +95,7 @@ def execute_statement(statement, table, line):
     print(statement)
     if statement == StatementType.STATEMENT_INSERT:
         print("This is where we would do an insert.\n")
+        
         return ExecuteResult.EXECUTE_SUCCESS,         execute_insert(line, table)
     elif statement == StatementType.STATEMENT_SELECT:
         print("This is where we would do a select.\n")
