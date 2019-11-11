@@ -2,7 +2,7 @@
 
 import sys
 
-from collections import namedtuple
+import typing
 from enum import Enum
 
 
@@ -32,6 +32,8 @@ class StatementType(Statement):
 CONST_MAX_PAGES = 1024
 CONST_MAX_ROW_PER_PAGE = 4096
 
+class RowTypeException(Exception):pass
+
 class Table():
 
     def __init__(self, ):
@@ -39,12 +41,12 @@ class Table():
         self.pages = CONST_MAX_PAGES
         self.index = [[]*CONST_MAX_PAGES]
         self.num_rows = 0
-        self.fields = ["id", "username", "email"]
-        self.Row = namedtuple('Row', self.fields)
-
+        self.fields = [("id", int), ("username", str), ("email", str)]
+        self.Row = typing.NamedTuple('Row', self.fields)
+        
     def insert_row(self, row):
         page = 0
-        self.index[page].append(        self.serialize_row(row))
+        self.index[page].append(self.serialize_row(row))
         self.num_rows +=1
         return "inserted 1 in {}".format(self.table_name)
     
@@ -55,7 +57,19 @@ class Table():
         return select
 
     def serialize_row(self, line):
-        return self.Row._make(line.split(" ")[1:])
+        """
+        Silently allow fields until handle exception better
+        # RowTypeException
+        """
+        values = line.split(" ")[1:]
+        result = []
+        for f, v in zip(self.fields, values):
+            try:
+                result.append(f[1](v))
+            except Exception:
+                result.append(v)
+
+        return self.Row._make(result)
 
 
 def do_meta_command(line):
@@ -75,14 +89,18 @@ def prepare_statement(line):
     if "insert" in line:
         STATEMENT_TYPE = StatementType.STATEMENT_INSERT
         input_buffer = line.split(" ")
+
+        # @TODO STRICTER ROW TYPE CHECKING
+        # typings.NamedTuple does not explictly check
         if len(input_buffer) != 4:
-            return "PREPARE_SYNTAX_ERROR", None
-        return "PREPARE_SUCCESS", STATEMENT_TYPE
+            print('syntax error')
+            return PrepareResult.PREPARE_SYNTAX_ERROR, STATEMENT_TYPE
+        return PrepareResult.PREPARE_SUCCESS, STATEMENT_TYPE
     elif "select" in line:
         STATEMENT_TYPE = StatementType.STATEMENT_SELECT
-        return "PREPARE_SUCCESS", STATEMENT_TYPE
+        return PrepareResult.PREPARE_SUCCESS, STATEMENT_TYPE
     else:
-        return "PREPARE_UNRECOGNIZED_STATEMENT", None
+        return PrepareResult.PREPARE_UNRECOGNIZED_STATEMENT, None
 
 
 def execute_statement(statement, table, line):
@@ -90,14 +108,13 @@ def execute_statement(statement, table, line):
   @returns {PrepareResult} 
   or PREPARE_UNRECOGNIZED_STATEMENT
   """
-    print(statement)
     if statement == StatementType.STATEMENT_INSERT:
         print("This is where we would do an insert.\n")
         
-        return ExecuteResult.EXECUTE_SUCCESS,         execute_insert(line, table)
+        return ExecuteResult.EXECUTE_SUCCESS, execute_insert(line, table)
     elif statement == StatementType.STATEMENT_SELECT:
         print("This is where we would do a select.\n")
-        return ExecuteResult.EXECUTE_SUCCESS,         execute_select(line, table)
+        return ExecuteResult.EXECUTE_SUCCESS, execute_select(line, table)
     else:
         return None, None
 
@@ -136,17 +153,17 @@ def main(line=None):
 
         # STATEMENT DETECT_TYPE PREPARE_SUCCESS ENUM AND PICK STATEMENT
         if prepare_status == PrepareResult.PREPARE_SUCCESS:
-            continue
+            
+            execute_status, results = execute_statement(statement, table, user_input)
+            if execute_status == ExecuteResult.EXECUTE_SUCCESS:
+                print('executed results:', results)
+                print("Executed.\n");
+            elif  execute_status == ExecuteResult.EXECUTE_TABLE_FULL:
+                print("Error: Table full.\n");
         elif prepare_status == PrepareResult.PREPARE_UNRECOGNIZED_STATEMENT:
             print("Unrecognized keyword at start of '{}'.\n".format(user_input))
-        execute_status, results = execute_statement(statement, table, user_input)
-        
-        if execute_status == ExecuteResult.EXECUTE_SUCCESS:
-            print('executed results:', results)
-            print("Executed.\n");
-        elif  execute_status == ExecuteResult.EXECUTE_TABLE_FULL:
-            print("Error: Table full.\n");
-
+        elif prepare_status == PrepareResult.PREPARE_SYNTAX_ERROR:
+            print("Incorrect format for '{}' command.\n".format(statement))
         # Get around to break
         if line:
             break
