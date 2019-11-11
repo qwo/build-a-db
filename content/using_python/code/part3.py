@@ -2,7 +2,6 @@
 
 import sys
 
-from dataclasses import dataclass
 from collections import namedtuple
 from enum import Enum
 
@@ -33,7 +32,6 @@ class StatementType(Statement):
 CONST_MAX_PAGES = 1024
 CONST_MAX_ROW_PER_PAGE = 4096
 
-@dataclass
 class Table():
 
     def __init__(self, ):
@@ -41,7 +39,7 @@ class Table():
         self.pages = CONST_MAX_PAGES
         self.index = [[]*CONST_MAX_PAGES]
         self.num_rows = 0
-        self.fields = ["id", "name", "email"]
+        self.fields = ["id", "username", "email"]
         self.Row = namedtuple('Row', self.fields)
 
     def insert_row(self, row):
@@ -100,6 +98,8 @@ def execute_statement(statement, table, line):
     elif statement == StatementType.STATEMENT_SELECT:
         print("This is where we would do a select.\n")
         return ExecuteResult.EXECUTE_SUCCESS,         execute_select(line, table)
+    else:
+        return None, None
 
 def execute_insert(line, table):
     return table.insert_row(line)
