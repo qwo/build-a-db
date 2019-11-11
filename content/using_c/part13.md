@@ -5,7 +5,7 @@ weight: 13
 
 For the next step on our epic b-tree implementation journey, we're going to handle fixing up the parent node after splitting a leaf. I'm going to use the following example as a reference:
 
-{% include image.html url="assets/images/updating-internal-node.png" description="Example of updating internal node" %}
+<img src="/assets/images/updating-internal-node.png" description="Example of updating internal node" />
 
 In this example, we add the key "3" to the tree. That causes the left leaf node to split. After the split we fix up the tree by doing the following:
 

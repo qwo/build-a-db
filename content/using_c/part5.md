@@ -35,7 +35,7 @@ We already set ourselves up to do that by serializing rows into page-sized memor
 
 To make this easier, we're going to make an abstraction called the pager. We ask the pager for page number `x`, and the pager gives us back a block of memory. It first looks in its cache. On a cache miss, it copies data from disk into memory (by reading the database file).
 
-{% include image.html url="assets/images/arch-part5.gif" description="How our program matches up with SQLite architecture" %}
+<img src="/assets/images/arch-part5.gif" description="How our program matches up with SQLite architecture" />
 
 The Pager accesses the page cache and the file. The Table object makes requests for pages through the pager:
 

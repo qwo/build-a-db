@@ -80,7 +80,7 @@ The body of a leaf node is an array of cells. Each cell is a key followed by a v
 
 Based on these constants, here's what the layout of a leaf node looks like currently:
 
-{% include image.html url="assets/images/leaf-node-format.png" description="Our leaf node format" %}
+<image src="/assets/images/leaf-node-format.png" description="Our leaf node format" >
 
 It's a little space inefficient to use an entire byte per boolean value in the header, but this makes it easier to write code to access those values.
 
@@ -296,12 +296,11 @@ A cursor represents a position in the table. When our table was a simple array o
 
 In this article we're only going to implement enough to get a single-node tree. Recall from last article that a tree starts out as an empty leaf node:
 
-{% include image.html url="assets/images/btree1.png" description="empty btree" %}
+<image src="/assets/images/btree1.png" description="empty btree" %}
 
-Key/value pairs can be added until the leaf node is full:
+K>/value pairs can be added until the leaf node is full:
 
-{% include image.html url="assets/images/btree2.png" description="one-node btree" %}
-
+<image src="/assets/images/btree2.png" description="one-node btree" %>
 When we open the database for the first time, the database file will be empty, so we initialize page 0 to be an empty leaf node (the root node):
 
 ```diff

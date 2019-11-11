@@ -7,11 +7,11 @@ Our B-Tree doesn't feel like much of a tree with only one node. To fix that, we 
 
 Basically our goal for this article is to go from this:
 
-{% include image.html url="assets/images/btree2.png" description="one-node btree" %}
+<img src="/assets/images/btree2.png" description="one-node btree" />
 
 to this:
 
-{% include image.html url="assets/images/btree3.png" description="two-level btree" %}
+<img src="/assets/images/btree3.png" description="two-level btree" />
 
 First things first, let's remove the error handling for a full leaf node:
 
@@ -214,7 +214,7 @@ The body is an array of cells where each cell contains a child pointer and a key
 
 Based on these constants, here's how the layout of an internal node will look:
 
-{% include image.html url="assets/images/internal-node-format.png" description="Our internal node format" %}
+<img src="/assets/images/internal-node-format.png" description="Our internal node format" />
 
 Notice our huge branching factor. Because each child pointer / key pair is so small, we can fit 510 keys and 511 child pointers in each internal node. That means we'll never have to traverse many layers of the tree to find a given key!
 
