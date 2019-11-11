@@ -1,0 +1,4 @@
+insert 1 foo foo@foo.com
+insert 2 bar bar@bar.com
+select
+.exit
