@@ -168,11 +168,35 @@ db &gt; .exit
 </span><span class=lnt>151
 </span><span class=lnt>152
 </span><span class=lnt>153
+</span><span class=lnt>154
+</span><span class=lnt>155
+</span><span class=lnt>156
+</span><span class=lnt>157
+</span><span class=lnt>158
+</span><span class=lnt>159
+</span><span class=lnt>160
+</span><span class=lnt>161
+</span><span class=lnt>162
+</span><span class=lnt>163
+</span><span class=lnt>164
+</span><span class=lnt>165
+</span><span class=lnt>166
+</span><span class=lnt>167
+</span><span class=lnt>168
+</span><span class=lnt>169
+</span><span class=lnt>170
+</span><span class=lnt>171
+</span><span class=lnt>172
+</span><span class=lnt>173
+</span><span class=lnt>174
+</span><span class=lnt>175
+</span><span class=lnt>176
+</span><span class=lnt>177
 </span></code></pre></td><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=ch>#!/usr/bin/python3</span>
 
 <span class=kn>import</span> <span class=nn>sys</span>
 
-<span class=kn>from</span> <span class=nn>dataclasses</span> <span class=kn>import</span> <span class=n>dataclass</span>
+<span class=kn>import</span> <span class=nn>typing</span>
 <span class=kn>from</span> <span class=nn>enum</span> <span class=kn>import</span> <span class=n>Enum</span>
 
 
@@ -202,18 +226,22 @@ db &gt; .exit
 <span class=n>CONST_MAX_PAGES</span> <span class=o>=</span> <span class=mi>1024</span>
 <span class=n>CONST_MAX_ROW_PER_PAGE</span> <span class=o>=</span> <span class=mi>4096</span>
 
-<span class=nd>@dataclass</span>
+<span class=k>class</span> <span class=nc>RowTypeException</span><span class=p>(</span><span class=ne>Exception</span><span class=p>):</span><span class=k>pass</span>
+
 <span class=k>class</span> <span class=nc>Table</span><span class=p>():</span>
 
-    <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+    <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=p>):</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>table_name</span> <span class=o>=</span> <span class=s2>&#34;default table&#34;</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>pages</span> <span class=o>=</span> <span class=n>CONST_MAX_PAGES</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>index</span> <span class=o>=</span> <span class=p>[[]</span><span class=o>*</span><span class=n>CONST_MAX_PAGES</span><span class=p>]</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>num_rows</span> <span class=o>=</span> <span class=mi>0</span>
-
+        <span class=bp>self</span><span class=o>.</span><span class=n>fields</span> <span class=o>=</span> <span class=p>[(</span><span class=s2>&#34;id&#34;</span><span class=p>,</span> <span class=nb>int</span><span class=p>),</span> <span class=p>(</span><span class=s2>&#34;username&#34;</span><span class=p>,</span> <span class=nb>str</span><span class=p>),</span> <span class=p>(</span><span class=s2>&#34;email&#34;</span><span class=p>,</span> <span class=nb>str</span><span class=p>)]</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>Row</span> <span class=o>=</span> <span class=n>typing</span><span class=o>.</span><span class=n>NamedTuple</span><span class=p>(</span><span class=s1>&#39;Row&#39;</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>fields</span><span class=p>)</span>
+        
     <span class=k>def</span> <span class=nf>insert_row</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>row</span><span class=p>):</span>
         <span class=n>page</span> <span class=o>=</span> <span class=mi>0</span>
-        <span class=bp>self</span><span class=o>.</span><span class=n>index</span><span class=p>[</span><span class=n>page</span><span class=p>]</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>row</span><span class=p>)</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>index</span><span class=p>[</span><span class=n>page</span><span class=p>]</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>serialize_row</span><span class=p>(</span><span class=n>row</span><span class=p>))</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>num_rows</span> <span class=o>+=</span><span class=mi>1</span>
         <span class=k>return</span> <span class=s2>&#34;inserted 1 in {}&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>table_name</span><span class=p>)</span>
     
     <span class=k>def</span> <span class=nf>select</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>line</span><span class=p>):</span>
@@ -221,6 +249,22 @@ db &gt; .exit
         <span class=k>for</span> <span class=n>i</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>index</span><span class=p>:</span>
             <span class=n>select</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
         <span class=k>return</span> <span class=n>select</span>
+
+    <span class=k>def</span> <span class=nf>serialize_row</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>line</span><span class=p>):</span>
+        <span class=s2>&#34;&#34;&#34;
+</span><span class=s2>        Silently allow fields until handle exception better
+</span><span class=s2>        # RowTypeException
+</span><span class=s2>        &#34;&#34;&#34;</span>
+        <span class=n>values</span> <span class=o>=</span> <span class=n>line</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=s2>&#34; &#34;</span><span class=p>)[</span><span class=mi>1</span><span class=p>:]</span>
+        <span class=n>result</span> <span class=o>=</span> <span class=p>[]</span>
+        <span class=k>for</span> <span class=n>f</span><span class=p>,</span> <span class=n>v</span> <span class=ow>in</span> <span class=nb>zip</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>fields</span><span class=p>,</span> <span class=n>values</span><span class=p>):</span>
+            <span class=k>try</span><span class=p>:</span>
+                <span class=n>result</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>f</span><span class=p>[</span><span class=mi>1</span><span class=p>](</span><span class=n>v</span><span class=p>))</span>
+            <span class=k>except</span> <span class=ne>Exception</span><span class=p>:</span>
+                <span class=n>result</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>v</span><span class=p>)</span>
+
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>Row</span><span class=o>.</span><span class=n>_make</span><span class=p>(</span><span class=n>result</span><span class=p>)</span>
+
 
 <span class=k>def</span> <span class=nf>do_meta_command</span><span class=p>(</span><span class=n>line</span><span class=p>):</span>
     <span class=s2>&#34;&#34;&#34;
@@ -239,14 +283,18 @@ db &gt; .exit
     <span class=k>if</span> <span class=s2>&#34;insert&#34;</span> <span class=ow>in</span> <span class=n>line</span><span class=p>:</span>
         <span class=n>STATEMENT_TYPE</span> <span class=o>=</span> <span class=n>StatementType</span><span class=o>.</span><span class=n>STATEMENT_INSERT</span>
         <span class=n>input_buffer</span> <span class=o>=</span> <span class=n>line</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=s2>&#34; &#34;</span><span class=p>)</span>
+
+        <span class=c1># @TODO STRICTER ROW TYPE CHECKING</span>
+        <span class=c1># typings.NamedTuple does not explictly check</span>
         <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>)</span> <span class=o>!=</span> <span class=mi>4</span><span class=p>:</span>
-            <span class=k>return</span> <span class=s2>&#34;PREPARE_SYNTAX_ERROR&#34;</span><span class=p>,</span> <span class=bp>None</span>
-        <span class=k>return</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
+            <span class=k>print</span><span class=p>(</span><span class=s1>&#39;syntax error&#39;</span><span class=p>)</span>
+            <span class=k>return</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SYNTAX_ERROR</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
+        <span class=k>return</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SUCCESS</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
     <span class=k>elif</span> <span class=s2>&#34;select&#34;</span> <span class=ow>in</span> <span class=n>line</span><span class=p>:</span>
         <span class=n>STATEMENT_TYPE</span> <span class=o>=</span> <span class=n>StatementType</span><span class=o>.</span><span class=n>STATEMENT_SELECT</span>
-        <span class=k>return</span> <span class=s2>&#34;PREPARE_SUCCESS&#34;</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
+        <span class=k>return</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SUCCESS</span><span class=p>,</span> <span class=n>STATEMENT_TYPE</span>
     <span class=k>else</span><span class=p>:</span>
-        <span class=k>return</span> <span class=s2>&#34;PREPARE_UNRECOGNIZED_STATEMENT&#34;</span><span class=p>,</span> <span class=bp>None</span>
+        <span class=k>return</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>,</span> <span class=bp>None</span>
 
 
 <span class=k>def</span> <span class=nf>execute_statement</span><span class=p>(</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>,</span> <span class=n>line</span><span class=p>):</span>
@@ -254,13 +302,15 @@ db &gt; .exit
 </span><span class=s2>  @returns {PrepareResult} 
 </span><span class=s2>  or PREPARE_UNRECOGNIZED_STATEMENT
 </span><span class=s2>  &#34;&#34;&#34;</span>
-    <span class=k>print</span><span class=p>(</span><span class=n>statement</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>statement</span> <span class=o>==</span> <span class=n>StatementType</span><span class=o>.</span><span class=n>STATEMENT_INSERT</span><span class=p>:</span>
         <span class=k>print</span><span class=p>(</span><span class=s2>&#34;This is where we would do an insert.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
-        <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span>         <span class=n>execute_insert</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
+        
+        <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span> <span class=n>execute_insert</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
     <span class=k>elif</span> <span class=n>statement</span> <span class=o>==</span> <span class=n>StatementType</span><span class=o>.</span><span class=n>STATEMENT_SELECT</span><span class=p>:</span>
         <span class=k>print</span><span class=p>(</span><span class=s2>&#34;This is where we would do a select.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
-        <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span>         <span class=n>execute_select</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
+        <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span> <span class=n>execute_select</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=k>return</span> <span class=bp>None</span><span class=p>,</span> <span class=bp>None</span>
 
 <span class=k>def</span> <span class=nf>execute_insert</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>):</span>
     <span class=k>return</span> <span class=n>table</span><span class=o>.</span><span class=n>insert_row</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
@@ -281,8 +331,6 @@ db &gt; .exit
         <span class=n>print_prompt</span><span class=p>()</span>
         <span class=n>user_input</span> <span class=o>=</span> <span class=n>line</span> <span class=ow>or</span> <span class=nb>input</span><span class=p>()</span>
         <span class=n>user_input</span> <span class=o>=</span> <span class=n>user_input</span><span class=o>.</span><span class=n>strip</span><span class=p>()</span>
-        <span class=c1># if user_input == &#34;.exit&#34;:</span>
-        <span class=c1>#     break</span>
 
         <span class=c1>## MetaCommand</span>
         <span class=k>if</span> <span class=n>user_input</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=o>==</span> <span class=s2>&#34;.&#34;</span><span class=p>:</span>
@@ -299,17 +347,17 @@ db &gt; .exit
 
         <span class=c1># STATEMENT DETECT_TYPE PREPARE_SUCCESS ENUM AND PICK STATEMENT</span>
         <span class=k>if</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SUCCESS</span><span class=p>:</span>
-            <span class=k>continue</span>
+            
+            <span class=n>execute_status</span><span class=p>,</span> <span class=n>results</span> <span class=o>=</span> <span class=n>execute_statement</span><span class=p>(</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>,</span> <span class=n>user_input</span><span class=p>)</span>
+            <span class=k>if</span> <span class=n>execute_status</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>:</span>
+                <span class=k>print</span><span class=p>(</span><span class=s1>&#39;executed results:&#39;</span><span class=p>,</span> <span class=n>results</span><span class=p>)</span>
+                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Executed.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>);</span>
+            <span class=k>elif</span>  <span class=n>execute_status</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_TABLE_FULL</span><span class=p>:</span>
+                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Error: Table full.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>);</span>
         <span class=k>elif</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>:</span>
             <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized keyword at start of &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
-        <span class=n>execute_status</span><span class=p>,</span> <span class=n>results</span> <span class=o>=</span> <span class=n>execute_statement</span><span class=p>(</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>,</span> <span class=n>user_input</span><span class=p>)</span>
-        
-        <span class=k>if</span> <span class=n>execute_status</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>:</span>
-            <span class=k>print</span><span class=p>(</span><span class=s1>&#39;executed results:&#39;</span><span class=p>,</span> <span class=n>results</span><span class=p>)</span>
-            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Executed.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>);</span>
-        <span class=k>elif</span>  <span class=n>execute_status</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_TABLE_FULL</span><span class=p>:</span>
-            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Error: Table full.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>);</span>
-
+        <span class=k>elif</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SYNTAX_ERROR</span><span class=p>:</span>
+            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Incorrect format for &#39;{}&#39; command.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>statement</span><span class=p>))</span>
         <span class=c1># Get around to break</span>
         <span class=k>if</span> <span class=n>line</span><span class=p>:</span>
             <span class=k>break</span>
