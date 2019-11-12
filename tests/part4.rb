@@ -29,7 +29,7 @@ describe 'database' do
       "select",
       ".exit",
     ])
-    expect(result).to match_array([
+    expect(result).to include([
       "db > Executed.",
       "db > (1, user1, person1@example.com)",
       "Executed.",

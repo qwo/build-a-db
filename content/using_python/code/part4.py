@@ -31,6 +31,7 @@ class StatementType(Statement):
 
 CONST_MAX_PAGES = 1024
 CONST_MAX_ROW_PER_PAGE = 4096
+CONST_MAX_ROWS = 1024
 
 class RowTypeException(Exception):pass
 
@@ -40,11 +41,15 @@ class Table():
         self.table_name = "default table"
         self.pages = CONST_MAX_PAGES
         self.index = [[]*CONST_MAX_PAGES]
+        self.max_rows = CONST_MAX_ROWS 
         self.num_rows = 0
         self.fields = [("id", int), ("username", str), ("email", str)]
         self.Row = typing.NamedTuple('Row', self.fields)
         
     def insert_row(self, row):
+
+        if self.num_rows > self.max_rows:
+            return  
         page = 0
         self.index[page].append(self.serialize_row(row))
         self.num_rows +=1
@@ -110,7 +115,10 @@ def execute_statement(statement, table, line):
   """
     if statement == StatementType.STATEMENT_INSERT:
         # print("This is where we would do an insert.\n")
-        return ExecuteResult.EXECUTE_SUCCESS, execute_insert(line, table)
+        result = execute_insert(line, table)
+        if result == ExecuteResult.EXECUTE_TABLE_FULL:
+            return ExecuteResult.EXECUTE_TABLE_FULL
+        return ExecuteResult.EXECUTE_SUCCESS, result
     elif statement == StatementType.STATEMENT_SELECT:
         # print("This is where we would do a select.\n")
         return ExecuteResult.EXECUTE_SUCCESS, execute_select(line, table)
@@ -126,7 +134,7 @@ def execute_select(line, table):
 
 
 def print_prompt():
-    print("db > ")
+    print("db > \ ")
 
 
 
@@ -144,7 +152,7 @@ def main(line=None):
             if meta_command == "META_COMMAND_SUCCESS":
                 pass
             elif meta_command == MetaCommandResult.META_COMMAND_UNRECOGNIZED_COMMAND:
-                print("Unrecognized command '{}'.\n".format(user_input))
+                print("Unrecognized command '{}'.".format(user_input))
             continue  # EXIT META COMMAND
 
         ## Statement
@@ -155,14 +163,14 @@ def main(line=None):
             
             execute_status, results = execute_statement(statement, table, user_input)
             if execute_status == ExecuteResult.EXECUTE_SUCCESS:
-                # print('executed results:', results)
-                print("Executed.\n");
+                print("Executed:")
+                print(results)
             elif  execute_status == ExecuteResult.EXECUTE_TABLE_FULL:
-                print("Error: Table full.\n");
+                print("Error: Table full.")
         elif prepare_status == PrepareResult.PREPARE_UNRECOGNIZED_STATEMENT:
-            print("Unrecognized keyword at start of '{}'.\n".format(user_input))
+            print("Unrecognized keyword at start of '{}'.".format(user_input))
         elif prepare_status == PrepareResult.PREPARE_SYNTAX_ERROR:
-            print("Incorrect format for '{}' command.\n".format(statement))
+            print("Incorrect format for '{}' command.".format(statement))
         # Get around to break
         if line:
             break

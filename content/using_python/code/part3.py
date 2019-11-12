@@ -109,11 +109,10 @@ def execute_statement(statement, table, line):
   or PREPARE_UNRECOGNIZED_STATEMENT
   """
     if statement == StatementType.STATEMENT_INSERT:
-        print("This is where we would do an insert.\n")
-        
+        # print("This is where we would do an insert.\n")
         return ExecuteResult.EXECUTE_SUCCESS, execute_insert(line, table)
     elif statement == StatementType.STATEMENT_SELECT:
-        print("This is where we would do a select.\n")
+        # print("This is where we would do a select.\n")
         return ExecuteResult.EXECUTE_SUCCESS, execute_select(line, table)
     else:
         return None, None
