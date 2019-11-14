@@ -11,5 +11,5 @@ publishdate: 2018-11-23T15:26:15Z
 ## Languages
 
 * C 
-* Python (coming soon)
+* Python (in progress)
 * Rust (coming Soon)

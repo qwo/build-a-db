@@ -7,7 +7,6 @@ https://cstack.github.io/db_tutorial/
 Supported Languages
 - C
 - Python [In-progress]
-- Rust [Back-burner]
 
 
 ## Features
