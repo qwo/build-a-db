@@ -7,10 +7,14 @@ puts "$PROGRAM_NAME : #{$PROGRAM_NAME}"
 puts "FILENAME": File.basename(__FILE__, File.extname(__FILE__))
 
 describe 'database' do
+
+   before do
+    `rm -rf test.db`
+  end
   def run_script(commands)
     base = File.basename(__FILE__, File.extname(__FILE__))
     raw_output = nil
-    IO.popen("./db #{base}", "r+") do |pipe|
+    IO.popen("./db test.db #{base}", "r+") do |pipe|
       commands.each do |command|
         pipe.puts command
       end
