@@ -1,21 +1,195 @@
-<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 3 - An In-Memory, Append-Only, Single-Table Database - Build a database in X</title><meta name=description content="Learn By Building"><meta name=generator content="Hugo 0.58.3"><link href=https://build-a-db.stanzheng.com/index.xml rel=alternate type=application/rss+xml><link rel=canonical href=https://build-a-db.stanzheng.com/using_python/part3/><link rel=stylesheet href=https://build-a-db.stanzheng.com/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=https://build-a-db.stanzheng.com/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=https://build-a-db.stanzheng.com/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 1.0.0</span><p class=description>Learn By Building</p></header><div class=global-menu><nav><ul><li><a href=/>Home</a></li><li><a href=https://github.com/stanzheng/build-a-db>Github</a></li><li><a href=https://twitter.com/stanzheng>Twitter</a></li></ul></nav></div><div class=content-container><main><h1>Part 3 - An In-Memory, Append-Only, Single-Table Database</h1><p>We&rsquo;re going to start small by putting a lot of limitations on our database. For now, it will:</p><ul><li>support two operations: inserting a row and printing all rows</li><li>reside only in memory (no persistence to disk)</li><li>support a single, hard-coded table</li></ul><p>Our hard-coded table is going to store users and look like this:</p><table><thead><tr><th>column</th><th>type</th></tr></thead><tbody><tr><td>id</td><td>integer</td></tr><tr><td>username</td><td>varchar(32)</td></tr><tr><td>email</td><td>varchar(255)</td></tr></tbody></table><p>This is a simple schema, but it gets us to support multiple data types and multiple sizes of text data types.</p><p><code>insert</code> statements are now going to look like this:</p><pre><code>insert 1 cstack foo@bar.com
-</code></pre><p><code>./part3.py</code>
-also accepts CLI <code>python ./part3.py</code></p><p>With those changes we can actually save data in our database!</p><div class=highlight><pre class=chroma><code class=language-command-line data-lang=command-line>~ ./db
-db &gt;
-$insert 1 cstack foo@bar.com
-Executed.
-db &gt;
-$insert 2 bob bob@example.com
-Executed.
-db &gt; select
-$(1, cstack, foo@bar.com)
-$(2, bob, bob@example.com)
-Executed.
-db &gt; 
-$insert foo bar 1
-Syntax error. Could not parse statement.
-db &gt; .exit
-~</code></pre></div><figure class=code><figcaption><h2>part3.py</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=lnt>  1
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Part 4 - Our First Tests (and Bugs) - Build a database in X</title><meta name=description content="Learn By Building"><meta name=generator content="Hugo 0.58.3"><link href=https://build-a-db.stanzheng.com/index.xml rel=alternate type=application/rss+xml><link rel=canonical href=https://build-a-db.stanzheng.com/using_python/code/part4/><link rel=stylesheet href=https://build-a-db.stanzheng.com/css/theme.min.css><script src=https://use.fontawesome.com/releases/v5.0.6/js/all.js></script><link rel=stylesheet href=https://build-a-db.stanzheng.com/css/chroma.min.css><script src=https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js></script><script src=https://cdn.jsdelivr.net/npm/jquery.easing@1.4.1/jquery.easing.min.js></script><script src=https://build-a-db.stanzheng.com/js/bundle.js></script><style>:root{}</style></head><body><div class=container><header><h1>Build a database in X</h1><span class=version>Version 1.0.0</span><p class=description>Learn By Building</p></header><div class=global-menu><nav><ul><li><a href=/>Home</a></li><li><a href=https://github.com/stanzheng/build-a-db>Github</a></li><li><a href=https://twitter.com/stanzheng>Twitter</a></li></ul></nav></div><div class=content-container><main><h1>Part 4 - Our First Tests (and Bugs)</h1><p>We&rsquo;ve got the ability to insert rows into our database and to print out all rows. Let&rsquo;s take a moment to test what we&rsquo;ve got so far.</p><p>I&rsquo;m going to use <a href=http://rspec.info/>rspec</a> to write my tests because I&rsquo;m familiar with it, and the syntax is fairly readable.</p><p>I&rsquo;ll define a short helper to send a list of commands to our database program then make assertions about the output:</p><p><code>rspec ../../../tests/part4.rb</code></p><p><figure class=code><figcaption><h2>part4.rb</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span><span class=lnt>70
+</span><span class=lnt>71
+</span><span class=lnt>72
+</span><span class=lnt>73
+</span><span class=lnt>74
+</span><span class=lnt>75
+</span><span class=lnt>76
+</span><span class=lnt>77
+</span><span class=lnt>78
+</span><span class=lnt>79
+</span><span class=lnt>80
+</span><span class=lnt>81
+</span><span class=lnt>82
+</span><span class=lnt>83
+</span><span class=lnt>84
+</span><span class=lnt>85
+</span><span class=lnt>86
+</span><span class=lnt>87
+</span><span class=lnt>88
+</span><span class=lnt>89
+</span><span class=lnt>90
+</span><span class=lnt>91
+</span><span class=lnt>92
+</span><span class=lnt>93
+</span><span class=lnt>94
+</span><span class=lnt>95
+</span><span class=lnt>96
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-python data-lang=python>
+<span class=c1>#!/usr/bin/env ruby</span>
+
+<span class=n>puts</span> <span class=s2>&#34;$0            : #{$0}&#34;</span>
+<span class=n>puts</span> <span class=s2>&#34;__FILE__      : #{__FILE__}&#34;</span>
+<span class=n>puts</span> <span class=s2>&#34;$PROGRAM_NAME : #{$PROGRAM_NAME}&#34;</span>
+<span class=n>puts</span> <span class=s2>&#34;FILENAME&#34;</span><span class=p>:</span> <span class=n>File</span><span class=o>.</span><span class=n>basename</span><span class=p>(</span><span class=n>__FILE__</span><span class=p>,</span> <span class=n>File</span><span class=o>.</span><span class=n>extname</span><span class=p>(</span><span class=n>__FILE__</span><span class=p>))</span>
+
+<span class=n>describe</span> <span class=s1>&#39;database&#39;</span> <span class=n>do</span>
+  <span class=k>def</span> <span class=nf>run_script</span><span class=p>(</span><span class=n>commands</span><span class=p>)</span>
+    <span class=n>base</span> <span class=o>=</span> <span class=n>File</span><span class=o>.</span><span class=n>basename</span><span class=p>(</span><span class=n>__FILE__</span><span class=p>,</span> <span class=n>File</span><span class=o>.</span><span class=n>extname</span><span class=p>(</span><span class=n>__FILE__</span><span class=p>))</span>
+    <span class=n>raw_output</span> <span class=o>=</span> <span class=n>nil</span>
+    <span class=n>IO</span><span class=o>.</span><span class=n>popen</span><span class=p>(</span><span class=s2>&#34;./db #{base}&#34;</span><span class=p>,</span> <span class=s2>&#34;r+&#34;</span><span class=p>)</span> <span class=n>do</span> <span class=o>|</span><span class=n>pipe</span><span class=o>|</span>
+      <span class=n>commands</span><span class=o>.</span><span class=n>each</span> <span class=n>do</span> <span class=o>|</span><span class=n>command</span><span class=o>|</span>
+        <span class=n>pipe</span><span class=o>.</span><span class=n>puts</span> <span class=n>command</span>
+      <span class=n>end</span>
+
+      <span class=n>pipe</span><span class=o>.</span><span class=n>close_write</span>
+
+      <span class=c1># Read entire output</span>
+      <span class=n>raw_output</span> <span class=o>=</span> <span class=n>pipe</span><span class=o>.</span><span class=n>gets</span><span class=p>(</span><span class=n>nil</span><span class=p>)</span>
+    <span class=n>end</span>
+    <span class=n>raw_output</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=s2>&#34;</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>)</span>
+  <span class=n>end</span>
+
+  <span class=n>it</span> <span class=s1>&#39;inserts and retreives a row&#39;</span> <span class=n>do</span>
+    <span class=n>result</span> <span class=o>=</span> <span class=n>run_script</span><span class=p>([</span>
+      <span class=s2>&#34;insert 1 user1 person1@example.com&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;select&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;.exit&#34;</span><span class=p>,</span>
+    <span class=p>])</span>
+    <span class=n>expect</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=o>.</span><span class=n>to</span> <span class=n>match_array</span><span class=p>([</span>
+      <span class=s2>&#34;db &gt; Executed.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; (1, user1, person1@example.com)&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;Executed.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; &#34;</span><span class=p>,</span>
+    <span class=p>])</span>
+  <span class=n>end</span>
+
+  <span class=n>it</span> <span class=s1>&#39;prints error message when table is full&#39;</span> <span class=n>do</span>
+    <span class=n>script</span> <span class=o>=</span> <span class=p>(</span><span class=mf>1.</span><span class=o>.</span><span class=mi>1401</span><span class=p>)</span><span class=o>.</span><span class=n>map</span> <span class=n>do</span> <span class=o>|</span><span class=n>i</span><span class=o>|</span>
+      <span class=s2>&#34;insert #{i} user#{i} person#{i}@example.com&#34;</span>
+    <span class=n>end</span>
+    <span class=n>script</span> <span class=o>&lt;&lt;</span> <span class=s2>&#34;.exit&#34;</span>
+    <span class=n>result</span> <span class=o>=</span> <span class=n>run_script</span><span class=p>(</span><span class=n>script</span><span class=p>)</span>
+    <span class=n>expect</span><span class=p>(</span><span class=n>result</span><span class=p>[</span><span class=o>-</span><span class=mi>2</span><span class=p>])</span><span class=o>.</span><span class=n>to</span> <span class=n>eq</span><span class=p>(</span><span class=s1>&#39;db &gt; Error: Table full.&#39;</span><span class=p>)</span>
+  <span class=n>end</span>
+
+  <span class=n>it</span> <span class=s1>&#39;allows inserting strings that are the maximum length&#39;</span> <span class=n>do</span>
+    <span class=n>long_username</span> <span class=o>=</span> <span class=s2>&#34;a&#34;</span><span class=o>*</span><span class=mi>32</span>
+    <span class=n>long_email</span> <span class=o>=</span> <span class=s2>&#34;a&#34;</span><span class=o>*</span><span class=mi>255</span>
+    <span class=n>script</span> <span class=o>=</span> <span class=p>[</span>
+      <span class=s2>&#34;insert 1 #{long_username} #{long_email}&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;select&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;.exit&#34;</span><span class=p>,</span>
+    <span class=p>]</span>
+    <span class=n>result</span> <span class=o>=</span> <span class=n>run_script</span><span class=p>(</span><span class=n>script</span><span class=p>)</span>
+    <span class=n>expect</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=o>.</span><span class=n>to</span> <span class=n>match_array</span><span class=p>([</span>
+      <span class=s2>&#34;db &gt; Executed.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; (1, #{long_username}, #{long_email})&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;Executed.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; &#34;</span><span class=p>,</span>
+    <span class=p>])</span>
+  <span class=n>end</span>
+
+  <span class=n>it</span> <span class=s1>&#39;prints error message if strings are too long&#39;</span> <span class=n>do</span>
+    <span class=n>long_username</span> <span class=o>=</span> <span class=s2>&#34;a&#34;</span><span class=o>*</span><span class=mi>33</span>
+    <span class=n>long_email</span> <span class=o>=</span> <span class=s2>&#34;a&#34;</span><span class=o>*</span><span class=mi>256</span>
+    <span class=n>puts</span> <span class=p>(</span><span class=s2>&#34;insert 1 #{long_username} #{long_email}&#34;</span><span class=p>)</span>
+    <span class=n>script</span> <span class=o>=</span> <span class=p>[</span>
+      <span class=s2>&#34;insert 1 #{long_username} #{long_email}&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;select&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;.exit&#34;</span><span class=p>,</span>
+    <span class=p>]</span>
+    <span class=n>result</span> <span class=o>=</span> <span class=n>run_script</span><span class=p>(</span><span class=n>script</span><span class=p>)</span>
+    <span class=n>expect</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=o>.</span><span class=n>to</span> <span class=n>match_array</span><span class=p>([</span>
+      <span class=s2>&#34;db &gt; String is too long.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; Executed.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; &#34;</span><span class=p>,</span>
+    <span class=p>])</span>
+  <span class=n>end</span>
+
+  <span class=n>it</span> <span class=s1>&#39;prints an error message if id is negative&#39;</span> <span class=n>do</span>
+    <span class=n>script</span> <span class=o>=</span> <span class=p>[</span>
+      <span class=s2>&#34;insert -1 cstack foo@bar.com&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;select&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;.exit&#34;</span><span class=p>,</span>
+    <span class=p>]</span>
+    <span class=n>result</span> <span class=o>=</span> <span class=n>run_script</span><span class=p>(</span><span class=n>script</span><span class=p>)</span>
+    <span class=n>expect</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=o>.</span><span class=n>to</span> <span class=n>match_array</span><span class=p>([</span>
+      <span class=s2>&#34;db &gt; ID must be positive.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; Executed.&#34;</span><span class=p>,</span>
+      <span class=s2>&#34;db &gt; &#34;</span><span class=p>,</span>
+    <span class=p>])</span>
+  <span class=n>end</span>
+<span class=n>end</span></code></pre></td></tr></table></div></div></figure><figure class=code><figcaption><h2>part4.py</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=lnt>  1
 </span><span class=lnt>  2
 </span><span class=lnt>  3
 </span><span class=lnt>  4
@@ -191,6 +365,14 @@ db &gt; .exit
 </span><span class=lnt>174
 </span><span class=lnt>175
 </span><span class=lnt>176
+</span><span class=lnt>177
+</span><span class=lnt>178
+</span><span class=lnt>179
+</span><span class=lnt>180
+</span><span class=lnt>181
+</span><span class=lnt>182
+</span><span class=lnt>183
+</span><span class=lnt>184
 </span></code></pre></td><td class=lntd><pre class=chroma><code class=language-python data-lang=python><span class=ch>#!/usr/bin/python3</span>
 
 <span class=kn>import</span> <span class=nn>sys</span>
@@ -224,6 +406,7 @@ db &gt; .exit
 
 <span class=n>CONST_MAX_PAGES</span> <span class=o>=</span> <span class=mi>1024</span>
 <span class=n>CONST_MAX_ROW_PER_PAGE</span> <span class=o>=</span> <span class=mi>4096</span>
+<span class=n>CONST_MAX_ROWS</span> <span class=o>=</span> <span class=mi>1024</span>
 
 <span class=k>class</span> <span class=nc>RowTypeException</span><span class=p>(</span><span class=ne>Exception</span><span class=p>):</span><span class=k>pass</span>
 
@@ -233,11 +416,15 @@ db &gt; .exit
         <span class=bp>self</span><span class=o>.</span><span class=n>table_name</span> <span class=o>=</span> <span class=s2>&#34;default table&#34;</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>pages</span> <span class=o>=</span> <span class=n>CONST_MAX_PAGES</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>index</span> <span class=o>=</span> <span class=p>[[]</span><span class=o>*</span><span class=n>CONST_MAX_PAGES</span><span class=p>]</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>max_rows</span> <span class=o>=</span> <span class=n>CONST_MAX_ROWS</span> 
         <span class=bp>self</span><span class=o>.</span><span class=n>num_rows</span> <span class=o>=</span> <span class=mi>0</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>fields</span> <span class=o>=</span> <span class=p>[(</span><span class=s2>&#34;id&#34;</span><span class=p>,</span> <span class=nb>int</span><span class=p>),</span> <span class=p>(</span><span class=s2>&#34;username&#34;</span><span class=p>,</span> <span class=nb>str</span><span class=p>),</span> <span class=p>(</span><span class=s2>&#34;email&#34;</span><span class=p>,</span> <span class=nb>str</span><span class=p>)]</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>Row</span> <span class=o>=</span> <span class=n>typing</span><span class=o>.</span><span class=n>NamedTuple</span><span class=p>(</span><span class=s1>&#39;Row&#39;</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>fields</span><span class=p>)</span>
         
     <span class=k>def</span> <span class=nf>insert_row</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>row</span><span class=p>):</span>
+
+        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>num_rows</span> <span class=o>&gt;</span> <span class=bp>self</span><span class=o>.</span><span class=n>max_rows</span><span class=p>:</span>
+            <span class=k>return</span>  
         <span class=n>page</span> <span class=o>=</span> <span class=mi>0</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>index</span><span class=p>[</span><span class=n>page</span><span class=p>]</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>serialize_row</span><span class=p>(</span><span class=n>row</span><span class=p>))</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>num_rows</span> <span class=o>+=</span><span class=mi>1</span>
@@ -303,7 +490,10 @@ db &gt; .exit
 </span><span class=s2>  &#34;&#34;&#34;</span>
     <span class=k>if</span> <span class=n>statement</span> <span class=o>==</span> <span class=n>StatementType</span><span class=o>.</span><span class=n>STATEMENT_INSERT</span><span class=p>:</span>
         <span class=c1># print(&#34;This is where we would do an insert.\n&#34;)</span>
-        <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span> <span class=n>execute_insert</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
+        <span class=n>result</span> <span class=o>=</span> <span class=n>execute_insert</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>result</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_TABLE_FULL</span><span class=p>:</span>
+            <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_TABLE_FULL</span>
+        <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span> <span class=n>result</span>
     <span class=k>elif</span> <span class=n>statement</span> <span class=o>==</span> <span class=n>StatementType</span><span class=o>.</span><span class=n>STATEMENT_SELECT</span><span class=p>:</span>
         <span class=c1># print(&#34;This is where we would do a select.\n&#34;)</span>
         <span class=k>return</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>,</span> <span class=n>execute_select</span><span class=p>(</span><span class=n>line</span><span class=p>,</span> <span class=n>table</span><span class=p>)</span>
@@ -319,7 +509,7 @@ db &gt; .exit
 
 
 <span class=k>def</span> <span class=nf>print_prompt</span><span class=p>():</span>
-    <span class=k>print</span><span class=p>(</span><span class=s2>&#34;db &gt; &#34;</span><span class=p>)</span>
+    <span class=k>print</span><span class=p>(</span><span class=s2>&#34;db &gt; \ &#34;</span><span class=p>)</span>
 
 
 
@@ -337,7 +527,7 @@ db &gt; .exit
             <span class=k>if</span> <span class=n>meta_command</span> <span class=o>==</span> <span class=s2>&#34;META_COMMAND_SUCCESS&#34;</span><span class=p>:</span>
                 <span class=k>pass</span>
             <span class=k>elif</span> <span class=n>meta_command</span> <span class=o>==</span> <span class=n>MetaCommandResult</span><span class=o>.</span><span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span><span class=p>:</span>
-                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized command &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
+                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized command &#39;{}&#39;.&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
             <span class=k>continue</span>  <span class=c1># EXIT META COMMAND</span>
 
         <span class=c1>## Statement</span>
@@ -348,14 +538,14 @@ db &gt; .exit
             
             <span class=n>execute_status</span><span class=p>,</span> <span class=n>results</span> <span class=o>=</span> <span class=n>execute_statement</span><span class=p>(</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>,</span> <span class=n>user_input</span><span class=p>)</span>
             <span class=k>if</span> <span class=n>execute_status</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_SUCCESS</span><span class=p>:</span>
-                <span class=k>print</span><span class=p>(</span><span class=s1>&#39;executed results:&#39;</span><span class=p>,</span> <span class=n>results</span><span class=p>)</span>
-                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Executed.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>);</span>
+                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Executed:&#34;</span><span class=p>)</span>
+                <span class=k>print</span><span class=p>(</span><span class=n>results</span><span class=p>)</span>
             <span class=k>elif</span>  <span class=n>execute_status</span> <span class=o>==</span> <span class=n>ExecuteResult</span><span class=o>.</span><span class=n>EXECUTE_TABLE_FULL</span><span class=p>:</span>
-                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Error: Table full.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=p>);</span>
+                <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Error: Table full.&#34;</span><span class=p>)</span>
         <span class=k>elif</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>:</span>
-            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized keyword at start of &#39;{}&#39;.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
+            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Unrecognized keyword at start of &#39;{}&#39;.&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>user_input</span><span class=p>))</span>
         <span class=k>elif</span> <span class=n>prepare_status</span> <span class=o>==</span> <span class=n>PrepareResult</span><span class=o>.</span><span class=n>PREPARE_SYNTAX_ERROR</span><span class=p>:</span>
-            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Incorrect format for &#39;{}&#39; command.</span><span class=se>\n</span><span class=s2>&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>statement</span><span class=p>))</span>
+            <span class=k>print</span><span class=p>(</span><span class=s2>&#34;Incorrect format for &#39;{}&#39; command.&#34;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>statement</span><span class=p>))</span>
         <span class=c1># Get around to break</span>
         <span class=k>if</span> <span class=n>line</span><span class=p>:</span>
             <span class=k>break</span>
@@ -367,5 +557,5 @@ db &gt; .exit
     <span class=k>else</span><span class=p>:</span>
         <span class=k>for</span> <span class=n>line</span> <span class=ow>in</span> <span class=n>sys</span><span class=o>.</span><span class=n>stdin</span><span class=p>:</span>
             <span class=n>main</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
-</code></pre></td></tr></table></div></div></figure><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_python/part3.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_python/part2/ title="Part 2 - World's Simplest SQL Compiler and Virtual Machine"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a>
-<a class="nav nav-next" href=/using_python/code/part4/ title="Part 4 - Our First Tests (and Bugs)">Next - Part 4 - Our First Tests (and Bugs) <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=https://build-a-db.stanzheng.com/>Home</a></li><li><a href=/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li><li class=parent><a href=/using_python/>How Does a Database Work? In [Python]</a><ul class=sub-menu><li><a href=/using_python/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_python/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li class=active><a href=/using_python/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_python/code/part4/>Part 4 - Our First Tests (and Bugs)</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
+</code></pre></td></tr></table></div></div></figure></p><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_python/code/part4.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_python/part3/ title="Part 3 - An In-Memory, Append-Only, Single-Table Database"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 3 - An In-Memory, Append-Only, Single-Table Database</a>
+<a class="nav nav-next" href=/using_python/part1/ title="Part 1 - Introduction and Setting up the REPL">Next - Part 1 - Introduction and Setting up the REPL <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=https://build-a-db.stanzheng.com/>Home</a></li><li><a href=/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li><li class=parent><a href=/using_python/>How Does a Database Work? In [Python]</a><ul class=sub-menu><li><a href=/using_python/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_python/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_python/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li class=active><a href=/using_python/code/part4/>Part 4 - Our First Tests (and Bugs)</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
