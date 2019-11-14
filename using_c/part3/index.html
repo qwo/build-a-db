@@ -157,222 +157,568 @@ Syntax error. Could not parse statement.
 db &gt; .exit
 ~</code></pre></div><p>Now would be a great time to write some tests, for a couple reasons:
 - We&rsquo;re planning to dramatically change the data structure storing our table, and tests would catch regressions.
-- There are a couple edge cases we haven&rsquo;t tested manually (e.g. filling up the table)</p><p>We&rsquo;ll address those issues in the next part. For now, here&rsquo;s the complete diff from this part:</p><div class=highlight><pre class=chroma><code class=language-diff data-lang=diff><span class=gu>@@ -2,6 +2,7 @@
-</span><span class=gu></span> #include &lt;stdio.h&gt;
- #include &lt;stdlib.h&gt;
- #include &lt;string.h&gt;
-<span class=gi>+#include &lt;stdint.h&gt;
-</span><span class=gi></span>
- typedef struct {
-   char* buffer;
-<span class=gu>@@ -10,6 +11,105 @@ typedef struct {
-</span><span class=gu></span> } InputBuffer;
+- There are a couple edge cases we haven&rsquo;t tested manually (e.g. filling up the table)</p><p>We&rsquo;ll address those issues in the next part. For now, here&rsquo;s the complete diff from this part:<figure class=code><figcaption><h2>part3.c</h2></figcaption><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code class=language-c data-lang=c><span class=lnt>  1
+</span><span class=lnt>  2
+</span><span class=lnt>  3
+</span><span class=lnt>  4
+</span><span class=lnt>  5
+</span><span class=lnt>  6
+</span><span class=lnt>  7
+</span><span class=lnt>  8
+</span><span class=lnt>  9
+</span><span class=lnt> 10
+</span><span class=lnt> 11
+</span><span class=lnt> 12
+</span><span class=lnt> 13
+</span><span class=lnt> 14
+</span><span class=lnt> 15
+</span><span class=lnt> 16
+</span><span class=lnt> 17
+</span><span class=lnt> 18
+</span><span class=lnt> 19
+</span><span class=lnt> 20
+</span><span class=lnt> 21
+</span><span class=lnt> 22
+</span><span class=lnt> 23
+</span><span class=lnt> 24
+</span><span class=lnt> 25
+</span><span class=lnt> 26
+</span><span class=lnt> 27
+</span><span class=lnt> 28
+</span><span class=lnt> 29
+</span><span class=lnt> 30
+</span><span class=lnt> 31
+</span><span class=lnt> 32
+</span><span class=lnt> 33
+</span><span class=lnt> 34
+</span><span class=lnt> 35
+</span><span class=lnt> 36
+</span><span class=lnt> 37
+</span><span class=lnt> 38
+</span><span class=lnt> 39
+</span><span class=lnt> 40
+</span><span class=lnt> 41
+</span><span class=lnt> 42
+</span><span class=lnt> 43
+</span><span class=lnt> 44
+</span><span class=lnt> 45
+</span><span class=lnt> 46
+</span><span class=lnt> 47
+</span><span class=lnt> 48
+</span><span class=lnt> 49
+</span><span class=lnt> 50
+</span><span class=lnt> 51
+</span><span class=lnt> 52
+</span><span class=lnt> 53
+</span><span class=lnt> 54
+</span><span class=lnt> 55
+</span><span class=lnt> 56
+</span><span class=lnt> 57
+</span><span class=lnt> 58
+</span><span class=lnt> 59
+</span><span class=lnt> 60
+</span><span class=lnt> 61
+</span><span class=lnt> 62
+</span><span class=lnt> 63
+</span><span class=lnt> 64
+</span><span class=lnt> 65
+</span><span class=lnt> 66
+</span><span class=lnt> 67
+</span><span class=lnt> 68
+</span><span class=lnt> 69
+</span><span class=lnt> 70
+</span><span class=lnt> 71
+</span><span class=lnt> 72
+</span><span class=lnt> 73
+</span><span class=lnt> 74
+</span><span class=lnt> 75
+</span><span class=lnt> 76
+</span><span class=lnt> 77
+</span><span class=lnt> 78
+</span><span class=lnt> 79
+</span><span class=lnt> 80
+</span><span class=lnt> 81
+</span><span class=lnt> 82
+</span><span class=lnt> 83
+</span><span class=lnt> 84
+</span><span class=lnt> 85
+</span><span class=lnt> 86
+</span><span class=lnt> 87
+</span><span class=lnt> 88
+</span><span class=lnt> 89
+</span><span class=lnt> 90
+</span><span class=lnt> 91
+</span><span class=lnt> 92
+</span><span class=lnt> 93
+</span><span class=lnt> 94
+</span><span class=lnt> 95
+</span><span class=lnt> 96
+</span><span class=lnt> 97
+</span><span class=lnt> 98
+</span><span class=lnt> 99
+</span><span class=lnt>100
+</span><span class=lnt>101
+</span><span class=lnt>102
+</span><span class=lnt>103
+</span><span class=lnt>104
+</span><span class=lnt>105
+</span><span class=lnt>106
+</span><span class=lnt>107
+</span><span class=lnt>108
+</span><span class=lnt>109
+</span><span class=lnt>110
+</span><span class=lnt>111
+</span><span class=lnt>112
+</span><span class=lnt>113
+</span><span class=lnt>114
+</span><span class=lnt>115
+</span><span class=lnt>116
+</span><span class=lnt>117
+</span><span class=lnt>118
+</span><span class=lnt>119
+</span><span class=lnt>120
+</span><span class=lnt>121
+</span><span class=lnt>122
+</span><span class=lnt>123
+</span><span class=lnt>124
+</span><span class=lnt>125
+</span><span class=lnt>126
+</span><span class=lnt>127
+</span><span class=lnt>128
+</span><span class=lnt>129
+</span><span class=lnt>130
+</span><span class=lnt>131
+</span><span class=lnt>132
+</span><span class=lnt>133
+</span><span class=lnt>134
+</span><span class=lnt>135
+</span><span class=lnt>136
+</span><span class=lnt>137
+</span><span class=lnt>138
+</span><span class=lnt>139
+</span><span class=lnt>140
+</span><span class=lnt>141
+</span><span class=lnt>142
+</span><span class=lnt>143
+</span><span class=lnt>144
+</span><span class=lnt>145
+</span><span class=lnt>146
+</span><span class=lnt>147
+</span><span class=lnt>148
+</span><span class=lnt>149
+</span><span class=lnt>150
+</span><span class=lnt>151
+</span><span class=lnt>152
+</span><span class=lnt>153
+</span><span class=lnt>154
+</span><span class=lnt>155
+</span><span class=lnt>156
+</span><span class=lnt>157
+</span><span class=lnt>158
+</span><span class=lnt>159
+</span><span class=lnt>160
+</span><span class=lnt>161
+</span><span class=lnt>162
+</span><span class=lnt>163
+</span><span class=lnt>164
+</span><span class=lnt>165
+</span><span class=lnt>166
+</span><span class=lnt>167
+</span><span class=lnt>168
+</span><span class=lnt>169
+</span><span class=lnt>170
+</span><span class=lnt>171
+</span><span class=lnt>172
+</span><span class=lnt>173
+</span><span class=lnt>174
+</span><span class=lnt>175
+</span><span class=lnt>176
+</span><span class=lnt>177
+</span><span class=lnt>178
+</span><span class=lnt>179
+</span><span class=lnt>180
+</span><span class=lnt>181
+</span><span class=lnt>182
+</span><span class=lnt>183
+</span><span class=lnt>184
+</span><span class=lnt>185
+</span><span class=lnt>186
+</span><span class=lnt>187
+</span><span class=lnt>188
+</span><span class=lnt>189
+</span><span class=lnt>190
+</span><span class=lnt>191
+</span><span class=lnt>192
+</span><span class=lnt>193
+</span><span class=lnt>194
+</span><span class=lnt>195
+</span><span class=lnt>196
+</span><span class=lnt>197
+</span><span class=lnt>198
+</span><span class=lnt>199
+</span><span class=lnt>200
+</span><span class=lnt>201
+</span><span class=lnt>202
+</span><span class=lnt>203
+</span><span class=lnt>204
+</span><span class=lnt>205
+</span><span class=lnt>206
+</span><span class=lnt>207
+</span><span class=lnt>208
+</span><span class=lnt>209
+</span><span class=lnt>210
+</span><span class=lnt>211
+</span><span class=lnt>212
+</span><span class=lnt>213
+</span><span class=lnt>214
+</span><span class=lnt>215
+</span><span class=lnt>216
+</span><span class=lnt>217
+</span><span class=lnt>218
+</span><span class=lnt>219
+</span><span class=lnt>220
+</span><span class=lnt>221
+</span><span class=lnt>222
+</span><span class=lnt>223
+</span><span class=lnt>224
+</span><span class=lnt>225
+</span><span class=lnt>226
+</span><span class=lnt>227
+</span><span class=lnt>228
+</span><span class=lnt>229
+</span><span class=lnt>230
+</span><span class=lnt>231
+</span><span class=lnt>232
+</span><span class=lnt>233
+</span><span class=lnt>234
+</span><span class=lnt>235
+</span><span class=lnt>236
+</span><span class=lnt>237
+</span><span class=lnt>238
+</span><span class=lnt>239
+</span><span class=lnt>240
+</span><span class=lnt>241
+</span><span class=lnt>242
+</span><span class=lnt>243
+</span><span class=lnt>244
+</span><span class=lnt>245
+</span><span class=lnt>246
+</span><span class=lnt>247
+</span><span class=lnt>248
+</span><span class=lnt>249
+</span><span class=lnt>250
+</span><span class=lnt>251
+</span><span class=lnt>252
+</span><span class=lnt>253
+</span><span class=lnt>254
+</span><span class=lnt>255
+</span><span class=lnt>256
+</span><span class=lnt>257
+</span><span class=lnt>258
+</span><span class=lnt>259
+</span><span class=lnt>260
+</span><span class=lnt>261
+</span><span class=lnt>262
+</span><span class=lnt>263
+</span><span class=lnt>264
+</span><span class=lnt>265
+</span><span class=lnt>266
+</span><span class=lnt>267
+</span><span class=lnt>268
+</span><span class=lnt>269
+</span><span class=lnt>270
+</span><span class=lnt>271
+</span><span class=lnt>272
+</span><span class=lnt>273
+</span><span class=lnt>274
+</span><span class=lnt>275
+</span><span class=lnt>276
+</span><span class=lnt>277
+</span><span class=lnt>278
+</span><span class=lnt>279
+</span><span class=lnt>280
+</span><span class=lnt>281
+</span><span class=lnt>282
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-c data-lang=c><span class=cp>#include</span> <span class=cpf>&lt;stdbool.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;stdio.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;stdlib.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;string.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;stdint.h&gt;</span><span class=cp>
+</span><span class=cp></span>
+<span class=k>typedef</span> <span class=k>struct</span>
+<span class=p>{</span>
+  <span class=kt>char</span> <span class=o>*</span><span class=n>buffer</span><span class=p>;</span>
+  <span class=n>size_t</span> <span class=n>buffer_length</span><span class=p>;</span>
+  <span class=n>ssize_t</span> <span class=n>input_length</span><span class=p>;</span>
+<span class=p>}</span> <span class=n>InputBuffer</span><span class=p>;</span>
 
-<span class=gi>+typedef enum { EXECUTE_SUCCESS, EXECUTE_TABLE_FULL } ExecuteResult;
-</span><span class=gi>+
-</span><span class=gi>+typedef enum {
-</span><span class=gi>+  META_COMMAND_SUCCESS,
-</span><span class=gi>+  META_COMMAND_UNRECOGNIZED_COMMAND
-</span><span class=gi>+} MetaCommandResult;
-</span><span class=gi>+
-</span><span class=gi>+typedef enum {
-</span><span class=gi>+  PREPARE_SUCCESS,
-</span><span class=gi>+  PREPARE_SYNTAX_ERROR,
-</span><span class=gi>+  PREPARE_UNRECOGNIZED_STATEMENT
-</span><span class=gi>+ } PrepareResult;
-</span><span class=gi>+
-</span><span class=gi>+typedef enum { STATEMENT_INSERT, STATEMENT_SELECT } StatementType;
-</span><span class=gi>+
-</span><span class=gi>+#define COLUMN_USERNAME_SIZE 32
-</span><span class=gi>+#define COLUMN_EMAIL_SIZE 255
-</span><span class=gi>+typedef struct {
-</span><span class=gi>+  uint32_t id;
-</span><span class=gi>+  char username[COLUMN_USERNAME_SIZE];
-</span><span class=gi>+  char email[COLUMN_EMAIL_SIZE];
-</span><span class=gi>+} Row;
-</span><span class=gi>+
-</span><span class=gi>+typedef struct {
-</span><span class=gi>+  StatementType type;
-</span><span class=gi>+  Row row_to_insert; //only used by insert statement
-</span><span class=gi>+} Statement;
-</span><span class=gi>+
-</span><span class=gi>+#define size_of_attribute(Struct, Attribute) sizeof(((Struct*)0)-&gt;Attribute)
-</span><span class=gi>+
-</span><span class=gi>+const uint32_t ID_SIZE = size_of_attribute(Row, id);
-</span><span class=gi>+const uint32_t USERNAME_SIZE = size_of_attribute(Row, username);
-</span><span class=gi>+const uint32_t EMAIL_SIZE = size_of_attribute(Row, email);
-</span><span class=gi>+const uint32_t ID_OFFSET = 0;
-</span><span class=gi>+const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
-</span><span class=gi>+const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-</span><span class=gi>+const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
-</span><span class=gi>+
-</span><span class=gi>+const uint32_t PAGE_SIZE = 4096;
-</span><span class=gi>+#define TABLE_MAX_PAGES 100
-</span><span class=gi>+const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
-</span><span class=gi>+const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
-</span><span class=gi>+
-</span><span class=gi>+typedef struct {
-</span><span class=gi>+  uint32_t num_rows;
-</span><span class=gi>+  void* pages[TABLE_MAX_PAGES];
-</span><span class=gi>+} Table;
-</span><span class=gi>+
-</span><span class=gi>+void print_row(Row* row) {
-</span><span class=gi>+  printf(&#34;(%d, %s, %s)\n&#34;, row-&gt;id, row-&gt;username, row-&gt;email);
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+void serialize_row(Row* source, void* destination) {
-</span><span class=gi>+  memcpy(destination + ID_OFFSET, &amp;(source-&gt;id), ID_SIZE);
-</span><span class=gi>+  memcpy(destination + USERNAME_OFFSET, &amp;(source-&gt;username), USERNAME_SIZE);
-</span><span class=gi>+  memcpy(destination + EMAIL_OFFSET, &amp;(source-&gt;email), EMAIL_SIZE);
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+void deserialize_row(void *source, Row* destination) {
-</span><span class=gi>+  memcpy(&amp;(destination-&gt;id), source + ID_OFFSET, ID_SIZE);
-</span><span class=gi>+  memcpy(&amp;(destination-&gt;username), source + USERNAME_OFFSET, USERNAME_SIZE);
-</span><span class=gi>+  memcpy(&amp;(destination-&gt;email), source + EMAIL_OFFSET, EMAIL_SIZE);
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+void* row_slot(Table* table, uint32_t row_num) {
-</span><span class=gi>+  uint32_t page_num = row_num / ROWS_PER_PAGE;
-</span><span class=gi>+  void *page = table-&gt;pages[page_num];
-</span><span class=gi>+  if (page == NULL) {
-</span><span class=gi>+     // Allocate memory only when we try to access page
-</span><span class=gi>+     page = table-&gt;pages[page_num] = malloc(PAGE_SIZE);
-</span><span class=gi>+  }
-</span><span class=gi>+  uint32_t row_offset = row_num % ROWS_PER_PAGE;
-</span><span class=gi>+  uint32_t byte_offset = row_offset * ROW_SIZE;
-</span><span class=gi>+  return page + byte_offset;
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+Table* new_table() {
-</span><span class=gi>+  Table* table = malloc(sizeof(Table));
-</span><span class=gi>+  table-&gt;num_rows = 0;
-</span><span class=gi>+  for (uint32_t i = 0; i &lt; TABLE_MAX_PAGES; i++) {
-</span><span class=gi>+     table-&gt;pages[i] = NULL;
-</span><span class=gi>+  }
-</span><span class=gi>+  return table;
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+void free_table(Table* table) {
-</span><span class=gi>+  for (int i = 0; table-&gt;pages[i]; i++) {
-</span><span class=gi>+     free(table-&gt;pages[i]);
-</span><span class=gi>+  }
-</span><span class=gi>+  free(table);
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi></span> InputBuffer* new_input_buffer() {
-   InputBuffer* input_buffer = malloc(sizeof(InputBuffer));
-   input_buffer-&gt;buffer = NULL;
-<span class=gu>@@ -40,17 +140,105 @@ void close_input_buffer(InputBuffer* input_buffer) {
-</span><span class=gu></span>     free(input_buffer);
- }
+<span class=k>typedef</span> <span class=k>enum</span>
+<span class=p>{</span>
+  <span class=n>EXECUTE_SUCCESS</span><span class=p>,</span>
+  <span class=n>EXECUTE_TABLE_FULL</span>
+<span class=p>}</span> <span class=n>ExecuteResult</span><span class=p>;</span>
 
-<span class=gi>+MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table *table) {
-</span><span class=gi>+  if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
-</span><span class=gi>+    close_input_buffer(input_buffer);
-</span><span class=gi>+    free_table(table);
-</span><span class=gi>+    exit(EXIT_SUCCESS);
-</span><span class=gi>+  } else {
-</span><span class=gi>+    return META_COMMAND_UNRECOGNIZED_COMMAND;
-</span><span class=gi>+  }
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+PrepareResult prepare_statement(InputBuffer* input_buffer,
-</span><span class=gi>+                                Statement* statement) {
-</span><span class=gi>+  if (strncmp(input_buffer-&gt;buffer, &#34;insert&#34;, 6) == 0) {
-</span><span class=gi>+    statement-&gt;type = STATEMENT_INSERT;
-</span><span class=gi>+    int args_assigned = sscanf(
-</span><span class=gi>+	input_buffer-&gt;buffer, &#34;insert %d %s %s&#34;, &amp;(statement-&gt;row_to_insert.id),
-</span><span class=gi>+	statement-&gt;row_to_insert.username, statement-&gt;row_to_insert.email
-</span><span class=gi>+	);
-</span><span class=gi>+    if (args_assigned &lt; 3) {
-</span><span class=gi>+	return PREPARE_SYNTAX_ERROR;
-</span><span class=gi>+    }
-</span><span class=gi>+    return PREPARE_SUCCESS;
-</span><span class=gi>+  }
-</span><span class=gi>+  if (strcmp(input_buffer-&gt;buffer, &#34;select&#34;) == 0) {
-</span><span class=gi>+    statement-&gt;type = STATEMENT_SELECT;
-</span><span class=gi>+    return PREPARE_SUCCESS;
-</span><span class=gi>+  }
-</span><span class=gi>+
-</span><span class=gi>+  return PREPARE_UNRECOGNIZED_STATEMENT;
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+ExecuteResult execute_insert(Statement* statement, Table* table) {
-</span><span class=gi>+  if (table-&gt;num_rows &gt;= TABLE_MAX_ROWS) {
-</span><span class=gi>+     return EXECUTE_TABLE_FULL;
-</span><span class=gi>+  }
-</span><span class=gi>+
-</span><span class=gi>+  Row* row_to_insert = &amp;(statement-&gt;row_to_insert);
-</span><span class=gi>+
-</span><span class=gi>+  serialize_row(row_to_insert, row_slot(table, table-&gt;num_rows));
-</span><span class=gi>+  table-&gt;num_rows += 1;
-</span><span class=gi>+
-</span><span class=gi>+  return EXECUTE_SUCCESS;
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+ExecuteResult execute_select(Statement* statement, Table* table) {
-</span><span class=gi>+  Row row;
-</span><span class=gi>+  for (uint32_t i = 0; i &lt; table-&gt;num_rows; i++) {
-</span><span class=gi>+     deserialize_row(row_slot(table, i), &amp;row);
-</span><span class=gi>+     print_row(&amp;row);
-</span><span class=gi>+  }
-</span><span class=gi>+  return EXECUTE_SUCCESS;
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi>+ExecuteResult execute_statement(Statement* statement, Table *table) {
-</span><span class=gi>+  switch (statement-&gt;type) {
-</span><span class=gi>+    case (STATEMENT_INSERT):
-</span><span class=gi>+       	return execute_insert(statement, table);
-</span><span class=gi>+    case (STATEMENT_SELECT):
-</span><span class=gi>+	return execute_select(statement, table);
-</span><span class=gi>+  }
-</span><span class=gi>+}
-</span><span class=gi>+
-</span><span class=gi></span> int main(int argc, char* argv[]) {
-<span class=gi>+  Table* table = new_table();
-</span><span class=gi></span>   InputBuffer* input_buffer = new_input_buffer();
-   while (true) {
-     print_prompt();
-     read_input(input_buffer);
+<span class=k>typedef</span> <span class=k>enum</span>
+<span class=p>{</span>
+  <span class=n>META_COMMAND_SUCCESS</span><span class=p>,</span>
+  <span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span>
+<span class=p>}</span> <span class=n>MetaCommandResult</span><span class=p>;</span>
 
-<span class=gd>-    if (strcmp(input_buffer-&gt;buffer, &#34;.exit&#34;) == 0) {
-</span><span class=gd>-      close_input_buffer(input_buffer);
-</span><span class=gd>-      exit(EXIT_SUCCESS);
-</span><span class=gd>-    } else {
-</span><span class=gd>-      printf(&#34;Unrecognized command &#39;%s&#39;.\n&#34;, input_buffer-&gt;buffer);
-</span><span class=gd></span><span class=gi>+    if (input_buffer-&gt;buffer[0] == &#39;.&#39;) {
-</span><span class=gi>+      switch (do_meta_command(input_buffer, table)) {
-</span><span class=gi>+        case (META_COMMAND_SUCCESS):
-</span><span class=gi>+          continue;
-</span><span class=gi>+        case (META_COMMAND_UNRECOGNIZED_COMMAND):
-</span><span class=gi>+          printf(&#34;Unrecognized command &#39;%s&#39;\n&#34;, input_buffer-&gt;buffer);
-</span><span class=gi>+          continue;
-</span><span class=gi>+      }
-</span><span class=gi>+    }
-</span><span class=gi>+
-</span><span class=gi>+    Statement statement;
-</span><span class=gi>+    switch (prepare_statement(input_buffer, &amp;statement)) {
-</span><span class=gi>+      case (PREPARE_SUCCESS):
-</span><span class=gi>+        break;
-</span><span class=gi>+      case (PREPARE_SYNTAX_ERROR):
-</span><span class=gi>+	printf(&#34;Syntax error. Could not parse statement.\n&#34;);
-</span><span class=gi>+	continue;
-</span><span class=gi>+      case (PREPARE_UNRECOGNIZED_STATEMENT):
-</span><span class=gi>+        printf(&#34;Unrecognized keyword at start of &#39;%s&#39;.\n&#34;,
-</span><span class=gi>+               input_buffer-&gt;buffer);
-</span><span class=gi>+        continue;
-</span><span class=gi>+    }
-</span><span class=gi>+
-</span><span class=gi>+    switch (execute_statement(&amp;statement, table)) {
-</span><span class=gi>+	case (EXECUTE_SUCCESS):
-</span><span class=gi>+	    printf(&#34;Executed.\n&#34;);
-</span><span class=gi>+	    break;
-</span><span class=gi>+	case (EXECUTE_TABLE_FULL):
-</span><span class=gi>+	    printf(&#34;Error: Table full.\n&#34;);
-</span><span class=gi>+	    break;
-</span><span class=gi></span>     }
-   }
- }
-</code></pre></div><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_c/part3.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_c/part2/ title="Part 2 - World's Simplest SQL Compiler and Virtual Machine"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a>
+<span class=k>typedef</span> <span class=k>enum</span>
+<span class=p>{</span>
+  <span class=n>PREPARE_SUCCESS</span><span class=p>,</span>
+  <span class=n>PREPARE_SYNTAX_ERROR</span><span class=p>,</span>
+  <span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span>
+<span class=p>}</span> <span class=n>PrepareResult</span><span class=p>;</span>
+
+<span class=k>typedef</span> <span class=k>enum</span>
+<span class=p>{</span>
+  <span class=n>STATEMENT_INSERT</span><span class=p>,</span>
+  <span class=n>STATEMENT_SELECT</span>
+<span class=p>}</span> <span class=n>StatementType</span><span class=p>;</span>
+
+<span class=cp>#define COLUMN_USERNAME_SIZE 32
+</span><span class=cp>#define COLUMN_EMAIL_SIZE 255
+</span><span class=cp></span><span class=k>typedef</span> <span class=k>struct</span>
+<span class=p>{</span>
+  <span class=n>uint32_t</span> <span class=n>id</span><span class=p>;</span>
+  <span class=kt>char</span> <span class=n>username</span><span class=p>[</span><span class=n>COLUMN_USERNAME_SIZE</span><span class=p>];</span>
+  <span class=kt>char</span> <span class=n>email</span><span class=p>[</span><span class=n>COLUMN_EMAIL_SIZE</span><span class=p>];</span>
+<span class=p>}</span> <span class=n>Row</span><span class=p>;</span>
+
+<span class=k>typedef</span> <span class=k>struct</span>
+<span class=p>{</span>
+  <span class=n>StatementType</span> <span class=n>type</span><span class=p>;</span>
+  <span class=n>Row</span> <span class=n>row_to_insert</span><span class=p>;</span> <span class=c1>//only used by insert statement
+</span><span class=c1></span><span class=p>}</span> <span class=n>Statement</span><span class=p>;</span>
+
+<span class=cp>#define size_of_attribute(Struct, Attribute) sizeof(((Struct *)0)-&gt;Attribute)
+</span><span class=cp></span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>ID_SIZE</span> <span class=o>=</span> <span class=n>size_of_attribute</span><span class=p>(</span><span class=n>Row</span><span class=p>,</span> <span class=n>id</span><span class=p>);</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>USERNAME_SIZE</span> <span class=o>=</span> <span class=n>size_of_attribute</span><span class=p>(</span><span class=n>Row</span><span class=p>,</span> <span class=n>username</span><span class=p>);</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>EMAIL_SIZE</span> <span class=o>=</span> <span class=n>size_of_attribute</span><span class=p>(</span><span class=n>Row</span><span class=p>,</span> <span class=n>email</span><span class=p>);</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>ID_OFFSET</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>USERNAME_OFFSET</span> <span class=o>=</span> <span class=n>ID_OFFSET</span> <span class=o>+</span> <span class=n>ID_SIZE</span><span class=p>;</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>EMAIL_OFFSET</span> <span class=o>=</span> <span class=n>USERNAME_OFFSET</span> <span class=o>+</span> <span class=n>USERNAME_SIZE</span><span class=p>;</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>ROW_SIZE</span> <span class=o>=</span> <span class=n>ID_SIZE</span> <span class=o>+</span> <span class=n>USERNAME_SIZE</span> <span class=o>+</span> <span class=n>EMAIL_SIZE</span><span class=p>;</span>
+
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>PAGE_SIZE</span> <span class=o>=</span> <span class=mi>4096</span><span class=p>;</span>
+<span class=cp>#define TABLE_MAX_PAGES 100
+</span><span class=cp></span><span class=k>const</span> <span class=n>uint32_t</span> <span class=n>ROWS_PER_PAGE</span> <span class=o>=</span> <span class=n>PAGE_SIZE</span> <span class=o>/</span> <span class=n>ROW_SIZE</span><span class=p>;</span>
+<span class=k>const</span> <span class=n>uint32_t</span> <span class=n>TABLE_MAX_ROWS</span> <span class=o>=</span> <span class=n>ROWS_PER_PAGE</span> <span class=o>*</span> <span class=n>TABLE_MAX_PAGES</span><span class=p>;</span>
+
+<span class=k>typedef</span> <span class=k>struct</span>
+<span class=p>{</span>
+  <span class=n>uint32_t</span> <span class=n>num_rows</span><span class=p>;</span>
+  <span class=kt>void</span> <span class=o>*</span><span class=n>pages</span><span class=p>[</span><span class=n>TABLE_MAX_PAGES</span><span class=p>];</span>
+<span class=p>}</span> <span class=n>Table</span><span class=p>;</span>
+
+<span class=kt>void</span> <span class=nf>print_row</span><span class=p>(</span><span class=n>Row</span> <span class=o>*</span><span class=n>row</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>printf</span><span class=p>(</span><span class=s>&#34;(%d, %s, %s)</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>,</span> <span class=n>row</span><span class=o>-&gt;</span><span class=n>id</span><span class=p>,</span> <span class=n>row</span><span class=o>-&gt;</span><span class=n>username</span><span class=p>,</span> <span class=n>row</span><span class=o>-&gt;</span><span class=n>email</span><span class=p>);</span>
+<span class=p>}</span>
+
+<span class=kt>void</span> <span class=nf>serialize_row</span><span class=p>(</span><span class=n>Row</span> <span class=o>*</span><span class=n>source</span><span class=p>,</span> <span class=kt>void</span> <span class=o>*</span><span class=n>destination</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>memcpy</span><span class=p>(</span><span class=n>destination</span> <span class=o>+</span> <span class=n>ID_OFFSET</span><span class=p>,</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>source</span><span class=o>-&gt;</span><span class=n>id</span><span class=p>),</span> <span class=n>ID_SIZE</span><span class=p>);</span>
+  <span class=n>memcpy</span><span class=p>(</span><span class=n>destination</span> <span class=o>+</span> <span class=n>USERNAME_OFFSET</span><span class=p>,</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>source</span><span class=o>-&gt;</span><span class=n>username</span><span class=p>),</span> <span class=n>USERNAME_SIZE</span><span class=p>);</span>
+  <span class=n>memcpy</span><span class=p>(</span><span class=n>destination</span> <span class=o>+</span> <span class=n>EMAIL_OFFSET</span><span class=p>,</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>source</span><span class=o>-&gt;</span><span class=n>email</span><span class=p>),</span> <span class=n>EMAIL_SIZE</span><span class=p>);</span>
+<span class=p>}</span>
+
+<span class=kt>void</span> <span class=nf>deserialize_row</span><span class=p>(</span><span class=kt>void</span> <span class=o>*</span><span class=n>source</span><span class=p>,</span> <span class=n>Row</span> <span class=o>*</span><span class=n>destination</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>memcpy</span><span class=p>(</span><span class=o>&amp;</span><span class=p>(</span><span class=n>destination</span><span class=o>-&gt;</span><span class=n>id</span><span class=p>),</span> <span class=n>source</span> <span class=o>+</span> <span class=n>ID_OFFSET</span><span class=p>,</span> <span class=n>ID_SIZE</span><span class=p>);</span>
+  <span class=n>memcpy</span><span class=p>(</span><span class=o>&amp;</span><span class=p>(</span><span class=n>destination</span><span class=o>-&gt;</span><span class=n>username</span><span class=p>),</span> <span class=n>source</span> <span class=o>+</span> <span class=n>USERNAME_OFFSET</span><span class=p>,</span> <span class=n>USERNAME_SIZE</span><span class=p>);</span>
+  <span class=n>memcpy</span><span class=p>(</span><span class=o>&amp;</span><span class=p>(</span><span class=n>destination</span><span class=o>-&gt;</span><span class=n>email</span><span class=p>),</span> <span class=n>source</span> <span class=o>+</span> <span class=n>EMAIL_OFFSET</span><span class=p>,</span> <span class=n>EMAIL_SIZE</span><span class=p>);</span>
+<span class=p>}</span>
+
+<span class=kt>void</span> <span class=o>*</span><span class=nf>row_slot</span><span class=p>(</span><span class=n>Table</span> <span class=o>*</span><span class=n>table</span><span class=p>,</span> <span class=n>uint32_t</span> <span class=n>row_num</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>uint32_t</span> <span class=n>page_num</span> <span class=o>=</span> <span class=n>row_num</span> <span class=o>/</span> <span class=n>ROWS_PER_PAGE</span><span class=p>;</span>
+  <span class=kt>void</span> <span class=o>*</span><span class=n>page</span> <span class=o>=</span> <span class=n>table</span><span class=o>-&gt;</span><span class=n>pages</span><span class=p>[</span><span class=n>page_num</span><span class=p>];</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>page</span> <span class=o>==</span> <span class=nb>NULL</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=c1>// Allocate memory only when we try to access page
+</span><span class=c1></span>    <span class=n>page</span> <span class=o>=</span> <span class=n>table</span><span class=o>-&gt;</span><span class=n>pages</span><span class=p>[</span><span class=n>page_num</span><span class=p>]</span> <span class=o>=</span> <span class=n>malloc</span><span class=p>(</span><span class=n>PAGE_SIZE</span><span class=p>);</span>
+  <span class=p>}</span>
+  <span class=n>uint32_t</span> <span class=n>row_offset</span> <span class=o>=</span> <span class=n>row_num</span> <span class=o>%</span> <span class=n>ROWS_PER_PAGE</span><span class=p>;</span>
+  <span class=n>uint32_t</span> <span class=n>byte_offset</span> <span class=o>=</span> <span class=n>row_offset</span> <span class=o>*</span> <span class=n>ROW_SIZE</span><span class=p>;</span>
+  <span class=k>return</span> <span class=n>page</span> <span class=o>+</span> <span class=n>byte_offset</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=n>Table</span> <span class=o>*</span><span class=nf>new_table</span><span class=p>()</span>
+<span class=p>{</span>
+  <span class=n>Table</span> <span class=o>*</span><span class=n>table</span> <span class=o>=</span> <span class=n>malloc</span><span class=p>(</span><span class=k>sizeof</span><span class=p>(</span><span class=n>Table</span><span class=p>));</span>
+  <span class=n>table</span><span class=o>-&gt;</span><span class=n>num_rows</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+  <span class=k>for</span> <span class=p>(</span><span class=n>uint32_t</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span> <span class=n>i</span> <span class=o>&lt;</span> <span class=n>TABLE_MAX_PAGES</span><span class=p>;</span> <span class=n>i</span><span class=o>++</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>table</span><span class=o>-&gt;</span><span class=n>pages</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=nb>NULL</span><span class=p>;</span>
+  <span class=p>}</span>
+  <span class=k>return</span> <span class=n>table</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=kt>void</span> <span class=nf>free_table</span><span class=p>(</span><span class=n>Table</span> <span class=o>*</span><span class=n>table</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=k>for</span> <span class=p>(</span><span class=kt>int</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span> <span class=n>table</span><span class=o>-&gt;</span><span class=n>pages</span><span class=p>[</span><span class=n>i</span><span class=p>];</span> <span class=n>i</span><span class=o>++</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>free</span><span class=p>(</span><span class=n>table</span><span class=o>-&gt;</span><span class=n>pages</span><span class=p>[</span><span class=n>i</span><span class=p>]);</span>
+  <span class=p>}</span>
+  <span class=n>free</span><span class=p>(</span><span class=n>table</span><span class=p>);</span>
+<span class=p>}</span>
+
+<span class=n>InputBuffer</span> <span class=o>*</span><span class=nf>new_input_buffer</span><span class=p>()</span>
+<span class=p>{</span>
+  <span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span> <span class=o>=</span> <span class=n>malloc</span><span class=p>(</span><span class=k>sizeof</span><span class=p>(</span><span class=n>InputBuffer</span><span class=p>));</span>
+  <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span> <span class=o>=</span> <span class=nb>NULL</span><span class=p>;</span>
+  <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer_length</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+  <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>input_length</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+
+  <span class=k>return</span> <span class=n>input_buffer</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=kt>void</span> <span class=nf>close_input_buffer</span><span class=p>(</span><span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>free</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>);</span>
+  <span class=n>free</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
+<span class=p>}</span>
+
+<span class=n>MetaCommandResult</span> <span class=nf>do_meta_command</span><span class=p>(</span><span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span><span class=p>,</span> <span class=n>Table</span> <span class=o>*</span><span class=n>table</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>strcmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;.exit&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>close_input_buffer</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
+    <span class=n>free_table</span><span class=p>(</span><span class=n>table</span><span class=p>);</span>
+    <span class=n>exit</span><span class=p>(</span><span class=n>EXIT_SUCCESS</span><span class=p>);</span>
+  <span class=p>}</span>
+  <span class=k>else</span>
+  <span class=p>{</span>
+    <span class=k>return</span> <span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span><span class=p>;</span>
+  <span class=p>}</span>
+<span class=p>}</span>
+
+<span class=n>PrepareResult</span> <span class=nf>prepare_statement</span><span class=p>(</span><span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span><span class=p>,</span>
+                                <span class=n>Statement</span> <span class=o>*</span><span class=n>statement</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>strncmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;insert&#34;</span><span class=p>,</span> <span class=mi>6</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>statement</span><span class=o>-&gt;</span><span class=n>type</span> <span class=o>=</span> <span class=n>STATEMENT_INSERT</span><span class=p>;</span>
+    <span class=kt>int</span> <span class=n>args_assigned</span> <span class=o>=</span> <span class=n>sscanf</span><span class=p>(</span>
+        <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;insert %d %s %s&#34;</span><span class=p>,</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>statement</span><span class=o>-&gt;</span><span class=n>row_to_insert</span><span class=p>.</span><span class=n>id</span><span class=p>),</span>
+        <span class=n>statement</span><span class=o>-&gt;</span><span class=n>row_to_insert</span><span class=p>.</span><span class=n>username</span><span class=p>,</span> <span class=n>statement</span><span class=o>-&gt;</span><span class=n>row_to_insert</span><span class=p>.</span><span class=n>email</span><span class=p>);</span>
+    <span class=k>if</span> <span class=p>(</span><span class=n>args_assigned</span> <span class=o>&lt;</span> <span class=mi>3</span><span class=p>)</span>
+    <span class=p>{</span>
+      <span class=k>return</span> <span class=n>PREPARE_SYNTAX_ERROR</span><span class=p>;</span>
+    <span class=p>}</span>
+    <span class=k>return</span> <span class=n>PREPARE_SUCCESS</span><span class=p>;</span>
+  <span class=p>}</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>strcmp</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>,</span> <span class=s>&#34;select&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>statement</span><span class=o>-&gt;</span><span class=n>type</span> <span class=o>=</span> <span class=n>STATEMENT_SELECT</span><span class=p>;</span>
+    <span class=k>return</span> <span class=n>PREPARE_SUCCESS</span><span class=p>;</span>
+  <span class=p>}</span>
+
+  <span class=k>return</span> <span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=n>ExecuteResult</span> <span class=nf>execute_insert</span><span class=p>(</span><span class=n>Statement</span> <span class=o>*</span><span class=n>statement</span><span class=p>,</span> <span class=n>Table</span> <span class=o>*</span><span class=n>table</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=k>if</span> <span class=p>(</span><span class=n>table</span><span class=o>-&gt;</span><span class=n>num_rows</span> <span class=o>&gt;=</span> <span class=n>TABLE_MAX_ROWS</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=k>return</span> <span class=n>EXECUTE_TABLE_FULL</span><span class=p>;</span>
+  <span class=p>}</span>
+
+  <span class=n>Row</span> <span class=o>*</span><span class=n>row_to_insert</span> <span class=o>=</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>statement</span><span class=o>-&gt;</span><span class=n>row_to_insert</span><span class=p>);</span>
+
+  <span class=n>serialize_row</span><span class=p>(</span><span class=n>row_to_insert</span><span class=p>,</span> <span class=n>row_slot</span><span class=p>(</span><span class=n>table</span><span class=p>,</span> <span class=n>table</span><span class=o>-&gt;</span><span class=n>num_rows</span><span class=p>));</span>
+  <span class=n>table</span><span class=o>-&gt;</span><span class=n>num_rows</span> <span class=o>+=</span> <span class=mi>1</span><span class=p>;</span>
+
+  <span class=k>return</span> <span class=n>EXECUTE_SUCCESS</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=n>ExecuteResult</span> <span class=nf>execute_select</span><span class=p>(</span><span class=n>Statement</span> <span class=o>*</span><span class=n>statement</span><span class=p>,</span> <span class=n>Table</span> <span class=o>*</span><span class=n>table</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>Row</span> <span class=n>row</span><span class=p>;</span>
+  <span class=k>for</span> <span class=p>(</span><span class=n>uint32_t</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span> <span class=n>i</span> <span class=o>&lt;</span> <span class=n>table</span><span class=o>-&gt;</span><span class=n>num_rows</span><span class=p>;</span> <span class=n>i</span><span class=o>++</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>deserialize_row</span><span class=p>(</span><span class=n>row_slot</span><span class=p>(</span><span class=n>table</span><span class=p>,</span> <span class=n>i</span><span class=p>),</span> <span class=o>&amp;</span><span class=n>row</span><span class=p>);</span>
+    <span class=n>print_row</span><span class=p>(</span><span class=o>&amp;</span><span class=n>row</span><span class=p>);</span>
+  <span class=p>}</span>
+  <span class=k>return</span> <span class=n>EXECUTE_SUCCESS</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=n>ExecuteResult</span> <span class=nf>execute_statement</span><span class=p>(</span><span class=n>Statement</span> <span class=o>*</span><span class=n>statement</span><span class=p>,</span> <span class=n>Table</span> <span class=o>*</span><span class=n>table</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=k>switch</span> <span class=p>(</span><span class=n>statement</span><span class=o>-&gt;</span><span class=n>type</span><span class=p>)</span>
+  <span class=p>{</span>
+  <span class=k>case</span> <span class=p>(</span><span class=n>STATEMENT_INSERT</span><span class=p>)</span><span class=o>:</span>
+    <span class=k>return</span> <span class=n>execute_insert</span><span class=p>(</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>);</span>
+  <span class=k>case</span> <span class=p>(</span><span class=n>STATEMENT_SELECT</span><span class=p>)</span><span class=o>:</span>
+    <span class=k>return</span> <span class=n>execute_select</span><span class=p>(</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>);</span>
+  <span class=p>}</span>
+<span class=p>}</span>
+
+<span class=kt>void</span> <span class=nf>print_prompt</span><span class=p>()</span> <span class=p>{</span> <span class=n>printf</span><span class=p>(</span><span class=s>&#34;db &gt; &#34;</span><span class=p>);</span> <span class=p>}</span>
+
+<span class=kt>void</span> <span class=nf>read_input</span><span class=p>(</span><span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span><span class=p>)</span>
+<span class=p>{</span>
+  <span class=n>ssize_t</span> <span class=n>bytes_read</span> <span class=o>=</span>
+      <span class=n>getline</span><span class=p>(</span><span class=o>&amp;</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>),</span> <span class=o>&amp;</span><span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer_length</span><span class=p>),</span> <span class=n>stdin</span><span class=p>);</span>
+
+  <span class=k>if</span> <span class=p>(</span><span class=n>bytes_read</span> <span class=o>&lt;=</span> <span class=mi>0</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Error reading input</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+    <span class=n>exit</span><span class=p>(</span><span class=n>EXIT_FAILURE</span><span class=p>);</span>
+  <span class=p>}</span>
+
+  <span class=c1>// Ignore trailing newline
+</span><span class=c1></span>  <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>input_length</span> <span class=o>=</span> <span class=n>bytes_read</span> <span class=o>-</span> <span class=mi>1</span><span class=p>;</span>
+  <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>[</span><span class=n>bytes_read</span> <span class=o>-</span> <span class=mi>1</span><span class=p>]</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span>
+<span class=p>}</span>
+
+<span class=kt>int</span> <span class=nf>main</span><span class=p>(</span><span class=kt>int</span> <span class=n>argc</span><span class=p>,</span> <span class=kt>char</span> <span class=o>*</span><span class=n>argv</span><span class=p>[])</span>
+<span class=p>{</span>
+  <span class=n>Table</span> <span class=o>*</span><span class=n>table</span> <span class=o>=</span> <span class=n>new_table</span><span class=p>();</span>
+  <span class=n>InputBuffer</span> <span class=o>*</span><span class=n>input_buffer</span> <span class=o>=</span> <span class=n>new_input_buffer</span><span class=p>();</span>
+  <span class=k>while</span> <span class=p>(</span><span class=nb>true</span><span class=p>)</span>
+  <span class=p>{</span>
+    <span class=n>print_prompt</span><span class=p>();</span>
+    <span class=n>read_input</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>);</span>
+
+    <span class=k>if</span> <span class=p>(</span><span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=o>==</span> <span class=sc>&#39;.&#39;</span><span class=p>)</span>
+    <span class=p>{</span>
+      <span class=k>switch</span> <span class=p>(</span><span class=n>do_meta_command</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>,</span> <span class=n>table</span><span class=p>))</span>
+      <span class=p>{</span>
+      <span class=k>case</span> <span class=p>(</span><span class=n>META_COMMAND_SUCCESS</span><span class=p>)</span><span class=o>:</span>
+        <span class=k>continue</span><span class=p>;</span>
+      <span class=k>case</span> <span class=p>(</span><span class=n>META_COMMAND_UNRECOGNIZED_COMMAND</span><span class=p>)</span><span class=o>:</span>
+        <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Unrecognized command &#39;%s&#39;</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>,</span> <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>);</span>
+        <span class=k>continue</span><span class=p>;</span>
+      <span class=p>}</span>
+    <span class=p>}</span>
+
+    <span class=n>Statement</span> <span class=n>statement</span><span class=p>;</span>
+    <span class=k>switch</span> <span class=p>(</span><span class=n>prepare_statement</span><span class=p>(</span><span class=n>input_buffer</span><span class=p>,</span> <span class=o>&amp;</span><span class=n>statement</span><span class=p>))</span>
+    <span class=p>{</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>PREPARE_SUCCESS</span><span class=p>)</span><span class=o>:</span>
+      <span class=k>break</span><span class=p>;</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>PREPARE_SYNTAX_ERROR</span><span class=p>)</span><span class=o>:</span>
+      <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Syntax error. Could not parse statement.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+      <span class=k>continue</span><span class=p>;</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>PREPARE_UNRECOGNIZED_STATEMENT</span><span class=p>)</span><span class=o>:</span>
+      <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Unrecognized keyword at start of &#39;%s&#39;.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>,</span>
+             <span class=n>input_buffer</span><span class=o>-&gt;</span><span class=n>buffer</span><span class=p>);</span>
+      <span class=k>continue</span><span class=p>;</span>
+    <span class=p>}</span>
+
+    <span class=k>switch</span> <span class=p>(</span><span class=n>execute_statement</span><span class=p>(</span><span class=o>&amp;</span><span class=n>statement</span><span class=p>,</span> <span class=n>table</span><span class=p>))</span>
+    <span class=p>{</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>EXECUTE_SUCCESS</span><span class=p>)</span><span class=o>:</span>
+      <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Executed.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+      <span class=k>break</span><span class=p>;</span>
+    <span class=k>case</span> <span class=p>(</span><span class=n>EXECUTE_TABLE_FULL</span><span class=p>)</span><span class=o>:</span>
+      <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Error: Table full.</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+      <span class=k>break</span><span class=p>;</span>
+    <span class=p>}</span>
+  <span class=p>}</span>
+<span class=p>}</span></code></pre></td></tr></table></div></div></figure></p><div class=edit-meta><br><a href=https://github.com/stanzheng/build-a-db/edit/master/content/using_c/part3.md class=edit-page><i class="fas fa-pen-square"></i>Edit on GitHub</a></div><nav class=pagination><a class="nav nav-prev" href=/using_c/part2/ title="Part 2 - World's Simplest SQL Compiler and Virtual Machine"><i class="fas fa-arrow-left" aria-hidden=true></i>Prev - Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a>
 <a class="nav nav-next" href=/using_c/part4/ title="Part 4 - Our First Tests (and Bugs)">Next - Part 4 - Our First Tests (and Bugs) <i class="fas fa-arrow-right" aria-hidden=true></i></a></nav><footer><p class=powered>Powered by <a href=https://gohugo.io>Hugo</a>. Theme by <a href=https://themes.gohugo.io/hugo-theme-techdoc/>TechDoc</a>. Designed by <a href=https://github.com/thingsym/hugo-theme-techdoc>Thingsym</a>.</p></footer></main><div class=sidebar><nav class=open-menu><ul><li><a href=https://build-a-db.stanzheng.com/>Home</a></li><li class=parent><a href=/using_c/>How Does a Database Work? In [C]</a><ul class=sub-menu><li><a href=/using_c/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_c/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li class=active><a href=/using_c/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_c/part4/>Part 4 - Our First Tests (and Bugs)</a></li><li><a href=/using_c/part5/>Part 5 - Persistence to Disk</a></li><li><a href=/using_c/part6/>Part 6 - The Cursor Abstraction</a></li><li><a href=/using_c/part7/>Part 7 - Introduction to the B-Tree</a></li><li><a href=/using_c/part8/>Part 8 - B-Tree Leaf Node Format</a></li><li><a href=/using_c/part9/>Part 9 - Binary Search and Duplicate Keys</a></li><li><a href=/using_c/part10/>Part 10 - Splitting a Leaf Node</a></li><li><a href=/using_c/part11/>Part 11 - Recursively Searching the B-Tree</a></li><li><a href=/using_c/part12/>Part 12 - Scanning a Multi-Level B-Tree</a></li><li><a href=/using_c/part13/>Part 13 - Updating Parent Node After a Split</a></li></ul></li><li><a href=/using_python/>How Does a Database Work? In [Python]</a><ul class=sub-menu><li><a href=/using_python/part1/>Part 1 - Introduction and Setting up the REPL</a></li><li><a href=/using_python/part2/>Part 2 - World&#39;s Simplest SQL Compiler and Virtual Machine</a></li><li><a href=/using_python/part3/>Part 3 - An In-Memory, Append-Only, Single-Table Database</a></li><li><a href=/using_python/code/part4/>Part 4 - Our First Tests (and Bugs)</a></li></ul></li></ul></nav><div class=sidebar-footer></div></div></div><a href=# id=backtothetop-fixed class=backtothetop data-backtothetop-duration=600 data-backtothetop-easing=easeOutQuart data-backtothetop-fixed-fadein=1000 data-backtothetop-fixed-fadeout=1000 data-backtothetop-fixed-bottom=10 data-backtothetop-fixed-right=20><span class="fa-layers fa-fw"><i class="fas fa-circle"></i><i class="fas fa-arrow-circle-up"></i></span></a></div></body></html>
