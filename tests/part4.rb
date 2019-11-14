@@ -66,7 +66,6 @@ describe 'database' do
   it 'prints error message if strings are too long' do
     long_username = "a"*33
     long_email = "a"*256
-    puts ("insert 1 #{long_username} #{long_email}")
     script = [
       "insert 1 #{long_username} #{long_email}",
       "select",
